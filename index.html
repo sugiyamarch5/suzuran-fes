@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#060818">
+  <meta property="og:title"       content="寺子屋すずらん | 夜市ゲーム">
+  <meta property="og:description" content="ガチャを回してゲームに挑戦しよう！🏮">
+  <meta property="og:type"        content="website">
+  <title>寺子屋すずらん | 夜市ゲーム</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* hidden属性をdisplay:flexより優先させる */
+    [hidden] { display: none !important; }
+
+    /* Hub-only: 灯りカウンター */
+    .lantern-count {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-accent);
+      background: rgba(245,200,66,.1);
+      border: 1px solid rgba(245,200,66,.2);
+      border-radius: var(--radius-full);
+      padding: 2px 10px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    /* 背景グロー */
+    .deco-dot {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      filter: blur(60px);
+      opacity: .18;
+    }
+
+    /* ===================================================
+       ガチャセクション
+    =================================================== */
+    .gacha-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      padding: 4px 0 28px;
+    }
+
+    .gacha-intro {
+      font-size: 13px;
+      color: var(--text-secondary);
+      text-align: center;
+      line-height: 1.8;
+    }
+
+    /* ----- マシン本体 ----- */
+    .gacha-machine {
+      position: relative;
+      width: 210px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      filter: drop-shadow(0 8px 24px rgba(80,160,255,0.25));
+    }
+
+    /* 球体 */
+    .gacha-globe {
+      width: 164px;
+      height: 164px;
+      border-radius: 50%;
+      background:
+        radial-gradient(ellipse at 32% 28%, rgba(255,255,255,0.22) 0%, transparent 52%),
+        radial-gradient(circle, rgba(100,180,255,0.14) 0%, rgba(8,14,50,0.75) 100%);
+      border: 4px solid #5aaaf0;
+      box-shadow:
+        0 0 0 2px #1a5090,
+        0 0 28px rgba(70,150,255,0.55),
+        inset 0 0 44px rgba(0,0,60,0.65);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .gacha-globe__shine {
+      position: absolute;
+      width: 46px;
+      height: 28px;
+      background: rgba(255,255,255,0.28);
+      border-radius: 50%;
+      top: 20px;
+      left: 26px;
+      transform: rotate(-25deg);
+      filter: blur(5px);
+      pointer-events: none;
+    }
+
+    .gacha-globe__caps {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      width: 130px;
+      justify-content: center;
+      font-size: 22px;
+      line-height: 1;
+      opacity: 0.9;
+      z-index: 1;
+    }
+
+    /* 球体→本体のリング */
+    .gacha-ring {
+      width: 176px;
+      height: 16px;
+      background: linear-gradient(180deg, #3a8ad4 0%, #1a5090 55%, #0e2e60 100%);
+      border-left: 3px solid #5aaaf0;
+      border-right: 3px solid #5aaaf0;
+      box-shadow: 0 3px 0 #081830;
+    }
+
+    /* 本体 */
+    .gacha-body {
+      width: 164px;
+      background: linear-gradient(180deg, #b53222 0%, #842012 70%, #601008 100%);
+      border: 3px solid #d04030;
+      border-top: none;
+      border-radius: 0 0 14px 14px;
+      padding: 10px 12px 14px;
+      text-align: center;
+      box-shadow: 0 6px 0 #3a0806, 0 0 18px rgba(200,60,40,0.5);
+    }
+
+    .gacha-brand {
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: #ffd44a;
+      letter-spacing: 0.2em;
+      text-shadow: 0 0 10px rgba(255,212,74,0.95), 0 0 24px rgba(255,212,74,0.4);
+      margin-bottom: 8px;
+    }
+
+    .gacha-coin-slot {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #180a08;
+      border: 2px solid #5a2010;
+      border-radius: 6px;
+      padding: 4px 12px;
+      font-size: 11px;
+      color: #c09070;
+      font-family: var(--font-mono);
+    }
+
+    /* ハンドル */
+    .gacha-handle {
+      position: absolute;
+      right: -12px;
+      bottom: 55px;
+      width: 52px;
+      height: 52px;
+      transform-origin: 6px 26px;
+    }
+
+    .gacha-handle.spinning {
+      animation: handleSpin 1.4s cubic-bezier(.4,0,.2,1) forwards;
+    }
+
+    @keyframes handleSpin {
+      0%   { transform: rotate(0deg); }
+      18%  { transform: rotate(-80deg); }
+      40%  { transform: rotate(45deg); }
+      58%  { transform: rotate(-55deg); }
+      74%  { transform: rotate(25deg); }
+      86%  { transform: rotate(-12deg); }
+      94%  { transform: rotate(6deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .gacha-handle__base {
+      position: absolute;
+      left: 0; top: 18px;
+      width: 12px; height: 18px;
+      background: linear-gradient(90deg, #444, #777, #444);
+      border-radius: 3px;
+      border: 1px solid #999;
+    }
+
+    .gacha-handle__arm {
+      position: absolute;
+      left: 8px; top: 22px;
+      width: 30px; height: 6px;
+      background: linear-gradient(180deg, #ccc 0%, #888 50%, #ccc 100%);
+      border-radius: 3px;
+    }
+
+    .gacha-handle__knob {
+      position: absolute;
+      right: 2px; top: 14px;
+      width: 22px; height: 22px;
+      background: radial-gradient(circle at 38% 34%, #ff9988, #c03020);
+      border-radius: 50%;
+      border: 2px solid #e04030;
+      box-shadow: 0 0 10px rgba(220,60,40,0.8);
+    }
+
+    /* 取り出し口 */
+    .gacha-outlet {
+      width: 88px;
+      height: 50px;
+      background: #0c0606;
+      border: 3px solid #5a1008;
+      border-top: none;
+      border-radius: 0 0 14px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: visible;
+      box-shadow: inset 0 0 12px rgba(0,0,0,0.9);
+    }
+
+    .gacha-outlet__label {
+      font-size: 9px;
+      color: #502820;
+      font-family: var(--font-mono);
+      letter-spacing: 0.12em;
+    }
+
+    /* カプセル落下 */
+    .capsule-fall {
+      position: absolute;
+      top: -190px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 38px;
+      animation: capsuleFall 1.1s cubic-bezier(.25,.46,.45,.94) forwards;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    @keyframes capsuleFall {
+      0%   { top: -190px; opacity: 0; transform: translateX(-50%) rotate(0deg) scale(0.6); }
+      12%  { opacity: 1; }
+      68%  { top: 30px;  transform: translateX(-50%) rotate(260deg) scale(1.05); }
+      80%  { top: 8px;   transform: translateX(-50%) rotate(275deg) scale(0.92); }
+      90%  { top: 20px;  transform: translateX(-50%) rotate(268deg) scale(0.97); }
+      100% { top: 15px;  transform: translateX(-50%) rotate(272deg) scale(1); }
+    }
+
+    /* ----- ガチャボタン ----- */
+    .gacha-btn {
+      background: linear-gradient(180deg, #f8a830 0%, #e07010 55%, #c05808 100%);
+      border: none;
+      border-bottom: 5px solid #7a3200;
+      border-radius: 50px;
+      color: #fff;
+      font-size: 19px;
+      font-weight: bold;
+      padding: 15px 42px;
+      cursor: pointer;
+      letter-spacing: 0.06em;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      box-shadow: 0 6px 26px rgba(200,90,0,0.65), 0 0 0 2px rgba(255,190,80,0.18);
+      transition: transform 0.08s, border-bottom-width 0.08s, box-shadow 0.08s;
+      font-family: var(--font-jp);
+    }
+
+    .gacha-btn:active {
+      transform: translateY(3px);
+      border-bottom-width: 2px;
+      box-shadow: 0 2px 12px rgba(200,90,0,0.4);
+    }
+
+    .gacha-btn:disabled {
+      opacity: 0.4;
+      cursor: default;
+      transform: none;
+    }
+
+    /* ----- 結果パネル ----- */
+    .gacha-result {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+      max-width: 300px;
+    }
+
+    .gacha-result__label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      letter-spacing: 0.14em;
+    }
+
+    .gacha-result__capsule {
+      font-size: 76px;
+      line-height: 1;
+      animation: capsulePop 0.55s ease-out;
+    }
+
+    @keyframes capsulePop {
+      0%  { transform: scale(0.3) rotate(-20deg); opacity: 0; }
+      55% { transform: scale(1.18) rotate(6deg);  opacity: 1; }
+      75% { transform: scale(0.9) rotate(-3deg); }
+      88% { transform: scale(1.04) rotate(1deg); }
+      100%{ transform: scale(1) rotate(0deg);  opacity: 1; }
+    }
+
+    .gacha-result__card {
+      width: 100%;
+      border: 2px solid;
+      border-radius: 20px;
+      padding: 24px 20px 20px;
+      text-align: center;
+      animation: slideUp 0.4s ease-out 0.35s both;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .gacha-result__game-icon {
+      font-size: 54px;
+      margin-bottom: 10px;
+    }
+
+    .gacha-result__game-name {
+      font-size: 21px;
+      font-weight: bold;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+
+    .gacha-result__game-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .gacha-result__actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      animation: slideUp 0.4s ease-out 0.55s both;
+    }
+
+    .btn-play {
+      display: block;
+      background: linear-gradient(180deg, #2ecc71 0%, #1aaa57 55%, #128840 100%);
+      border: none;
+      border-bottom: 4px solid #0a5028;
+      border-radius: 50px;
+      color: #fff;
+      font-size: 17px;
+      font-weight: bold;
+      padding: 14px 24px;
+      text-align: center;
+      text-decoration: none;
+      box-shadow: 0 4px 20px rgba(46,204,113,0.55);
+      transition: transform 0.08s, border-bottom-width 0.08s;
+      font-family: var(--font-jp);
+    }
+
+    .btn-play:active {
+      transform: translateY(2px);
+      border-bottom-width: 2px;
+    }
+
+    .btn-retry {
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.15);
+      border-radius: 50px;
+      color: var(--text-secondary);
+      font-size: 14px;
+      padding: 11px 24px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+      font-family: var(--font-jp);
+    }
+
+    .btn-retry:hover {
+      border-color: rgba(255,255,255,0.35);
+      color: var(--text-primary);
+      background: rgba(255,255,255,0.09);
+    }
+  </style>
+</head>
+<body>
+
+<!-- 星空背景 -->
+<div id="stars" aria-hidden="true"></div>
+
+<!-- 背景グロー -->
+<div class="deco-dot" style="width:260px;height:260px;background:#e74c3c;top:-60px;left:-80px;" aria-hidden="true"></div>
+<div class="deco-dot" style="width:200px;height:200px;background:#4a9de0;bottom:120px;right:-60px;" aria-hidden="true"></div>
+
+<main class="hub" aria-label="寺子屋すずらん 夜市ゲーム ハブページ">
+
+  <!-- ヘッダー -->
+  <header class="hub__header">
+    <p class="hub__tagline">こわがらず、うのみにせず。</p>
+    <h1 class="hub__title">寺子屋すずらん</h1>
+    <p class="hub__subtitle">AIの聞き方・調べ方・考え方</p>
+    <span class="hub__badge">🏮 夜市ゲーム</span>
+  </header>
+
+  <!-- 灯り収集 -->
+  <section class="hub__lanterns" aria-label="収集した灯り">
+    <p class="hub__lanterns-label">
+      あつめた灯り
+      <span class="lantern-count" id="lantern-count">0 / 4</span>
+    </p>
+    <div class="lantern-row" role="list">
+      <div class="lantern lantern--red"    id="lantern-1" data-game="1" role="listitem" aria-label="赤ちょうちん">
+        <span class="lantern__icon" aria-hidden="true">🏮</span>
+        <span class="lantern__name">赤</span>
+      </div>
+      <div class="lantern lantern--blue"   id="lantern-2" data-game="2" role="listitem" aria-label="青ちょうちん">
+        <span class="lantern__icon" aria-hidden="true">🔵</span>
+        <span class="lantern__name">青</span>
+      </div>
+      <div class="lantern lantern--purple" id="lantern-3" data-game="3" role="listitem" aria-label="紫ちょうちん">
+        <span class="lantern__icon" aria-hidden="true">💜</span>
+        <span class="lantern__name">紫</span>
+      </div>
+      <div class="lantern lantern--gold"   id="lantern-4" data-game="4" role="listitem" aria-label="金ちょうちん">
+        <span class="lantern__icon" aria-hidden="true">✨</span>
+        <span class="lantern__name">金</span>
+      </div>
+      <div class="lantern lantern--secret" id="lantern-5" data-game="5" role="listitem" aria-label="シークレット">
+        <span class="lantern__icon" aria-hidden="true">🎴</span>
+        <span class="lantern__name">レア</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ガチャセクション ===== -->
+  <section class="gacha-section" aria-label="ガチャゲーム選択">
+
+    <p class="gacha-intro">
+      ガチャを回してゲームを決めよう！<br>
+      <span style="font-size:11px;">どの冒険が当たるかな？ 🎰</span>
+    </p>
+
+    <!-- ガチャマシン -->
+    <div class="gacha-machine" id="gachaMachine" aria-hidden="true">
+
+      <!-- 上部・透明球体 -->
+      <div class="gacha-globe">
+        <div class="gacha-globe__shine"></div>
+        <div class="gacha-globe__caps" id="globeCaps">
+          🔴🔵🟣🟡🔴🔵🟣🟡🔴🔵
+        </div>
+      </div>
+
+      <!-- リング（球体と本体の継ぎ目） -->
+      <div class="gacha-ring"></div>
+
+      <!-- 本体 -->
+      <div class="gacha-body">
+        <div class="gacha-brand">★ GACHA ★</div>
+        <div class="gacha-coin-slot">💴 コイン投入</div>
+      </div>
+
+      <!-- ハンドル（右側） -->
+      <div class="gacha-handle" id="gachaHandle">
+        <div class="gacha-handle__base"></div>
+        <div class="gacha-handle__arm"></div>
+        <div class="gacha-handle__knob"></div>
+      </div>
+
+      <!-- 取り出し口 -->
+      <div class="gacha-outlet" id="gachaOutlet">
+        <span class="gacha-outlet__label">OPEN</span>
+      </div>
+
+    </div><!-- /.gacha-machine -->
+
+    <!-- ガチャボタン（idle時） -->
+    <button class="gacha-btn" id="gachaBtn" onclick="startGacha()">
+      🎰 ガチャを回す！
+    </button>
+
+    <!-- 結果パネル（初期非表示） -->
+    <div class="gacha-result" id="gachaResult" hidden>
+      <p class="gacha-result__label">✨ カプセルが出てきたよ！</p>
+      <div class="gacha-result__capsule" id="resultCapsule">🔴</div>
+      <div class="gacha-result__card" id="resultCard">
+        <div class="gacha-result__game-icon" id="resultIcon">🍧</div>
+        <div class="gacha-result__game-name" id="resultName">屋台スピードパズル</div>
+        <div class="gacha-result__game-desc" id="resultDesc">食材を正しい順に提供しよう！</div>
+      </div>
+      <div class="gacha-result__actions">
+        <a class="btn-play" id="playBtn" href="#">▶ このゲームで遊ぶ！</a>
+        <button class="btn-retry" onclick="resetGacha()">🔄 もう一回ガチャを引く</button>
+      </div>
+    </div>
+
+  </section><!-- /.gacha-section -->
+
+  <!-- LINE シェア -->
+  <section class="hub__share" aria-label="LINEでシェア">
+    <button class="btn-line" onclick="shareLINE()" aria-label="LINEでこのゲームをシェアする">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
+      </svg>
+      LINEでシェア
+    </button>
+    <p class="hub__share-hint">友だちにも教えよう！</p>
+  </section>
+
+  <footer class="hub__footer">
+    <p>© 寺子屋すずらん</p>
+  </footer>
+
+</main>
+
+<script src="common.js"></script>
+<script>
+  const GAMES = [
+    {
+      id: 1, capsule: '🔴', icon: '🍧',
+      name: '屋台スピードパズル',
+      desc: '食材を正しい順に提供しよう！',
+      url: 'game1-yatai/',
+      color: 'rgba(180,40,30,0.18)',
+      border: '#c0392b',
+      glow: 'rgba(192,57,43,0.35)'
+    },
+    {
+      id: 2, capsule: '🔵', icon: '🎮',
+      name: 'ネオンクレーン',
+      desc: '光るアイテムをゲットしよう！',
+      url: 'game2-crane/',
+      color: 'rgba(30,80,180,0.18)',
+      border: '#2980b9',
+      glow: 'rgba(41,128,185,0.35)'
+    },
+    {
+      id: 3, capsule: '🟣', icon: '🔍',
+      name: '夜店ミステリー',
+      desc: '謎を解いて真相を暴け！',
+      url: 'game3-mystery/',
+      color: 'rgba(120,50,170,0.18)',
+      border: '#7d3c98',
+      glow: 'rgba(125,60,152,0.35)'
+    },
+    {
+      id: 4, capsule: '🟡', icon: '🌿',
+      name: '灯りの迷路',
+      desc: '暗闇の迷路を抜け出せ！',
+      url: 'game4-maze/',
+      color: 'rgba(180,140,0,0.18)',
+      border: '#d4a000',
+      glow: 'rgba(212,160,0,0.35)'
+    },
+  ];
+
+  let spinning = false;
+
+  initStars(document.getElementById('stars'));
+  updateLanternDisplay();
+
+  function refreshCount() {
+    const n = getLanterns().filter(id => id >= 1 && id <= 4).length;
+    document.getElementById('lantern-count').textContent = `${n} / 4`;
+  }
+  refreshCount();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      updateLanternDisplay();
+      refreshCount();
+    }
+  });
+
+  function startGacha() {
+    if (spinning) return;
+    spinning = true;
+
+    const btn    = document.getElementById('gachaBtn');
+    const handle = document.getElementById('gachaHandle');
+    const outlet = document.getElementById('gachaOutlet');
+    btn.disabled = true;
+
+    const game = GAMES[Math.floor(Math.random() * GAMES.length)];
+
+    // ハンドルアニメ開始
+    handle.classList.add('spinning');
+
+    // 0.9s後：カプセル落下
+    setTimeout(() => {
+      const cap = document.createElement('div');
+      cap.className = 'capsule-fall';
+      cap.textContent = game.capsule;
+      outlet.appendChild(cap);
+
+      // 落下完了後：結果表示
+      setTimeout(() => {
+        cap.remove();
+        handle.classList.remove('spinning');
+        showResult(game);
+      }, 1150);
+    }, 900);
+  }
+
+  function showResult(game) {
+    document.getElementById('gachaBtn').hidden = true;
+
+    document.getElementById('resultCapsule').textContent = game.capsule;
+    document.getElementById('resultIcon').textContent    = game.icon;
+    document.getElementById('resultName').textContent    = game.name;
+    document.getElementById('resultDesc').textContent    = game.desc;
+    document.getElementById('playBtn').href              = game.url;
+
+    const card = document.getElementById('resultCard');
+    card.style.borderColor = game.border;
+    card.style.background  = game.color;
+    card.style.boxShadow   = `0 0 28px ${game.glow}`;
+
+    document.getElementById('gachaResult').hidden = false;
+    spinning = false;
+  }
+
+  function resetGacha() {
+    document.getElementById('gachaResult').hidden = true;
+    const btn = document.getElementById('gachaBtn');
+    btn.hidden   = false;
+    btn.disabled = false;
+  }
+
+  function shareLINE() {
+    const url  = encodeURIComponent(location.href);
+    const text = encodeURIComponent('寺子屋すずらん 夜市ゲーム🏮 ガチャを引いてゲームに挑戦！');
+    window.open(`https://line.me/R/msg/text/?${text}%0A${url}`, '_blank');
+  }
+</script>
+</body>
+</html>

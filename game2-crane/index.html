@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#060818">
+  <title>ネオンクレーン | 寺子屋すずらん</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    body { overflow: hidden; height: 100vh; height: 100dvh; }
+
+    .page {
+      height: 100vh; height: 100dvh;
+      display: flex; flex-direction: column;
+      max-width: 480px; padding: 0;
+    }
+
+    /* ピクセルアート夜市背景 */
+    .game-bg {
+      position: fixed; inset: 0; z-index: -1;
+      background: url('assets/game2-bg.png') center top / cover no-repeat;
+    }
+    .game-bg::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(6,8,24,.5) 0%, rgba(6,8,24,.3) 50%, rgba(6,8,24,.78) 100%);
+    }
+    .game-header { background: rgba(6,8,24,.72); backdrop-filter: blur(6px); }
+    .hud         { background: rgba(6,8,24,.6);  backdrop-filter: blur(4px); }
+    .controls    { background: rgba(10,14,36,.82) !important; backdrop-filter: blur(4px); }
+
+    .canvas-wrap {
+      flex: 1; min-height: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent;
+      overflow: hidden;
+    }
+
+    #gc { display: block; }
+
+    .controls {
+      background: var(--sky-mid);
+      border-top: 1px solid var(--border);
+      padding: var(--sp-md);
+      padding-bottom: max(var(--sp-md), env(safe-area-inset-bottom));
+      display: flex; align-items: center; justify-content: center; gap: var(--sp-lg);
+    }
+
+    .btn-drop {
+      width: 160px; height: 58px;
+      background: var(--lantern-blue);
+      color: #fff;
+      font-size: 18px; font-weight: 900;
+      letter-spacing: .1em;
+      border-radius: var(--radius-full);
+      box-shadow: 0 0 22px rgba(74,157,224,.55), 0 4px 12px rgba(0,0,0,.4);
+      transition: transform .1s, box-shadow .1s, opacity .2s;
+    }
+    .btn-drop:active  { transform: scale(.92); box-shadow: 0 0 10px rgba(74,157,224,.3); }
+    .btn-drop:disabled { opacity: .4; }
+
+    .caught-meter {
+      display: flex; gap: 5px; align-items: center;
+    }
+    .caught-dot {
+      font-size: 20px; opacity: .22;
+      filter: grayscale(1) brightness(.6);
+      transition: opacity .3s, filter .3s, transform .3s;
+    }
+    .caught-dot.is-lit {
+      opacity: 1; filter: drop-shadow(0 0 6px var(--lantern-blue));
+      transform: scale(1.15);
+    }
+
+    /* スタート画面 */
+    .start-screen {
+      position: fixed; inset: 0; z-index: 950;
+      background: rgba(6,8,24,.93);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: var(--sp-xl); gap: var(--sp-md);
+    }
+    .start-screen__icon  { font-size: 62px; }
+    .start-screen__title { font-size: 22px; font-weight: 900; color: var(--text-accent); }
+    .start-screen__rule  { font-size: 13px; color: var(--text-secondary); line-height: 1.9; }
+  </style>
+</head>
+<body>
+
+<div class="game-bg" aria-hidden="true"></div>
+<div id="stars" aria-hidden="true"></div>
+
+<main class="page">
+  <h1 class="sr-only">ネオンクレーン — クレーンを操作して光るアイテムをキャッチするゲーム</h1>
+
+  <header class="game-header">
+    <a class="game-header__back" href="../index.html" aria-label="ハブに戻る">‹</a>
+    <span class="game-header__title">🎮 ネオンクレーン</span>
+    <span class="game-header__score" id="score">0</span>
+  </header>
+
+  <div class="hud">
+    <div class="hud__item">
+      <div class="hud__label">TIME</div>
+      <div class="hud__value hud__value--time" id="time">60</div>
+    </div>
+    <div class="hud__item">
+      <div class="hud__label">CAUGHT</div>
+      <div class="hud__value hud__value--combo" id="caught-count">0</div>
+    </div>
+    <div class="hud__item">
+      <div class="hud__label">GOAL</div>
+      <div class="caught-meter" id="meter">
+        <span class="caught-dot" data-i="0">🔵</span>
+        <span class="caught-dot" data-i="1">🔵</span>
+        <span class="caught-dot" data-i="2">🔵</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap" id="canvas-wrap">
+    <canvas id="gc"></canvas>
+  </div>
+
+  <div class="controls">
+    <button class="btn-drop" id="btn-drop" disabled aria-label="クレーンを下ろす">
+      ↓ DROP ↓
+    </button>
+  </div>
+</main>
+
+<!-- スタート画面 -->
+<div class="start-screen" id="start-screen">
+  <div class="start-screen__icon">🎮</div>
+  <div class="start-screen__title">ネオンクレーン</div>
+  <p class="start-screen__rule">
+    クレーンが左右に動いてるよ！<br>
+    タイミングを見計らって<br>
+    <strong style="color:var(--text-accent)">DROP</strong> ボタンでクレーンを下ろそう🌟<br><br>
+    制限時間内に <strong style="color:var(--lantern-blue)">3個</strong> キャッチすると<br>
+    🔵 青ちょうちん ゲット！
+  </p>
+  <button class="btn btn--primary" id="start-btn">スタート！</button>
+</div>
+
+<script src="../common.js"></script>
+<script>
+'use strict';
+
+// ================================================================
+// 定数
+// ================================================================
+const LW = 320, LH = 420;   // ロジカルキャンバスサイズ
+
+const CRANE_CY  = 24;        // クレーン車の中心Y
+const CRANE_HW  = 26;        // クレーン車の半幅
+const CRANE_H   = 26;        // クレーン車の高さ
+const REST_LEN  = 52;        // 待機時の爪の長さ
+const CLAW_SPD  = 5.8;       // 爪の移動速度 px/frame
+const CRANE_SPD_INIT = 2.3;
+const CRANE_SPD_MAX  = 5.0;
+const CRANE_SPD_STEP = 0.32; // キャッチ毎の速度増加
+const CRANE_MRG = CRANE_HW + 6;
+const CATCH_R   = 27;        // 当たり判定半径（広めで優しい）
+const ITEM_R    = 21;        // アイテムの表示半径
+const GOAL      = 3;
+const GAME_SEC  = 60;
+
+// アイテム定義
+const ITEM_DEFS = [
+  { icon:'🧸', color:'#ff6b9d' },
+  { icon:'🌟', color:'#ffd700' },
+  { icon:'💎', color:'#00d4ff' },
+  { icon:'🎀', color:'#ff9f00' },
+  { icon:'🦊', color:'#ff6600' },
+  { icon:'🐱', color:'#c084fc' },
+  { icon:'🍭', color:'#2ecc71' },
+];
+// 固定配置（相対座標）
+const SLOTS = [
+  [0.15,0.59],[0.50,0.60],[0.85,0.59],
+  [0.30,0.76],[0.70,0.75],
+  [0.12,0.88],[0.88,0.88],
+];
+
+// ================================================================
+// 状態
+// ================================================================
+let gs = {};
+let raf = null, timer = null, over = false;
+
+function makeItems() {
+  return ITEM_DEFS.map((d, i) => ({
+    ...d, x: SLOTS[i][0]*LW, y: SLOTS[i][1]*LH, caught: false,
+  }));
+}
+
+function restY() { return CRANE_CY + CRANE_H/2 + REST_LEN; }
+
+function initState() {
+  gs = {
+    phase: 'idle',        // 'idle'|'descend'|'ascend'
+    craneX: LW/2, craneDir: 1, craneSpd: CRANE_SPD_INIT,
+    clawY: restY(), clawOpen: true, heldItem: null,
+    items: makeItems(), score: 0, caught: 0, goalReached: false,
+  };
+  over = false;
+}
+
+// ================================================================
+// Canvas セットアップ
+// ================================================================
+let canvas, ctx;
+
+function setupCanvas() {
+  canvas = document.getElementById('gc');
+  ctx    = canvas.getContext('2d');
+  canvas.width  = LW;
+  canvas.height = LH;
+
+  function resize() {
+    const wrap = document.getElementById('canvas-wrap');
+    const s = Math.min(wrap.clientWidth / LW, wrap.clientHeight / LH);
+    canvas.style.width  = (LW * s) + 'px';
+    canvas.style.height = (LH * s) + 'px';
+  }
+  resize();
+  window.addEventListener('resize', resize, { passive:true });
+}
+
+// ================================================================
+// 更新
+// ================================================================
+function update() {
+  // クレーン左右移動（常時）
+  gs.craneX += gs.craneDir * gs.craneSpd;
+  if (gs.craneX >= LW - CRANE_MRG) { gs.craneX = LW - CRANE_MRG; gs.craneDir = -1; }
+  if (gs.craneX <= CRANE_MRG)       { gs.craneX = CRANE_MRG;       gs.craneDir =  1; }
+
+  if (gs.phase === 'descend') {
+    gs.clawY += CLAW_SPD;
+    if (gs.clawY >= LH - 16) {                        // 床に到達
+      gs.clawY = LH - 16; gs.clawOpen = false; gs.phase = 'ascend'; return;
+    }
+    for (const item of gs.items) {                    // アイテムに当たった
+      if (!item.caught && Math.hypot(gs.craneX - item.x, gs.clawY - item.y) < CATCH_R) {
+        gs.clawOpen = false; gs.heldItem = item; item.caught = true;
+        gs.phase = 'ascend'; return;
+      }
+    }
+  }
+
+  if (gs.phase === 'ascend') {
+    gs.clawY -= CLAW_SPD;
+    if (gs.clawY <= restY()) {
+      gs.clawY = restY(); gs.clawOpen = true;
+      if (gs.heldItem) {
+        gs.caught++; gs.score += 100;
+        gs.craneSpd = Math.min(gs.craneSpd + CRANE_SPD_STEP, CRANE_SPD_MAX);
+        getCatchFx(gs.craneX);
+        gs.heldItem = null;
+        updateHUD();
+        if (gs.caught >= GOAL && !gs.goalReached) {
+          gs.goalReached = true; showToast('🔵 青ちょうちん ゲット！');
+        }
+        if (gs.items.every(i => i.caught)) gs.items = makeItems(); // 全取得→リセット
+      }
+      gs.phase = 'idle';
+      if (!over) dropBtn.disabled = false;
+    }
+  }
+}
+
+// ================================================================
+// 描画
+// ================================================================
+function draw() {
+  ctx.clearRect(0, 0, LW, LH);
+  drawBg();
+  drawItems();
+  drawCrane();
+}
+
+function drawBg() {
+  const g = ctx.createLinearGradient(0, 0, 0, LH);
+  g.addColorStop(0,'#080820'); g.addColorStop(1,'#0e1632');
+  ctx.fillStyle = g; ctx.fillRect(0,0,LW,LH);
+
+  // 外枠
+  ctx.strokeStyle = 'rgba(74,157,224,.28)'; ctx.lineWidth = 2;
+  ctx.strokeRect(1,1,LW-2,LH-2);
+
+  // 天井レール
+  glow('#4a9de0', 8, () => {
+    ctx.strokeStyle='rgba(74,157,224,.65)'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(0,4); ctx.lineTo(LW,4); ctx.stroke();
+  });
+
+  // 床ライン
+  glow('#4a9de0', 14, () => {
+    ctx.strokeStyle='rgba(74,157,224,.7)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(0,LH-7); ctx.lineTo(LW,LH-7); ctx.stroke();
+  });
+
+  // スピードバー（キャッチ数に連動）
+  const pct = (gs.craneSpd - CRANE_SPD_INIT) / (CRANE_SPD_MAX - CRANE_SPD_INIT);
+  if (pct > 0) {
+    glow('#ff6b9d', 6, () => {
+      ctx.fillStyle = `rgba(255,107,157,${0.45+pct*0.45})`;
+      ctx.fillRect(0,0,LW*pct,4);
+    });
+  }
+}
+
+function drawItems() {
+  for (const item of gs.items) {
+    if (item.caught) continue;
+    ctx.save();
+    glow(item.color, 20, () => {
+      ctx.fillStyle = item.color+'22'; ctx.strokeStyle = item.color; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(item.x, item.y, ITEM_R, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke();
+    });
+    // 内側リング
+    ctx.strokeStyle = item.color+'66'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(item.x, item.y, ITEM_R-6, 0, Math.PI*2); ctx.stroke();
+    // 絵文字
+    ctx.font = '21px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'white';
+    ctx.fillText(item.icon, item.x, item.y+1);
+    ctx.restore();
+  }
+}
+
+function drawCrane() {
+  const cx = gs.craneX;
+  const carTop = CRANE_CY - CRANE_H/2;
+  const tip = gs.clawY;
+
+  ctx.save();
+
+  // ワイヤー（破線）
+  ctx.strokeStyle = 'rgba(180,210,255,.42)'; ctx.lineWidth = 2;
+  ctx.setLineDash([5,5]);
+  ctx.beginPath(); ctx.moveTo(cx, CRANE_CY + CRANE_H/2); ctx.lineTo(cx, tip); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // クレーン車ボディ
+  glow('#4a9de0', 14, () => {
+    ctx.fillStyle = '#1a2540'; ctx.strokeStyle = '#4a9de0'; ctx.lineWidth = 2;
+    rr(cx-CRANE_HW, carTop, CRANE_HW*2, CRANE_H, 5); ctx.fill(); ctx.stroke();
+  });
+
+  // ライト3つ
+  ['#ff4444','#ffd700','#4a9de0'].forEach((c,i) => {
+    glow(c, 8, () => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(cx-12+i*12, carTop+8, 4, 0, Math.PI*2); ctx.fill(); });
+  });
+
+  // 爪アーム
+  const ang = gs.clawOpen ? 0.44 : 0.1, AL = 16;
+  glow('#4a9de0', 10, () => {
+    ctx.strokeStyle = '#4a9de0'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    [-1,1].forEach(s => {
+      ctx.beginPath(); ctx.moveTo(cx, tip);
+      ctx.lineTo(cx + s*Math.sin(ang)*AL, tip + Math.cos(ang)*AL); ctx.stroke();
+    });
+  });
+
+  // つかんでいるアイテム
+  if (gs.heldItem) {
+    ctx.font = '22px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'white';
+    ctx.fillText(gs.heldItem.icon, cx, tip + AL + 14);
+  }
+
+  ctx.restore();
+}
+
+// グロー付き描画ヘルパー
+function glow(color, blur, fn) {
+  ctx.shadowBlur = blur; ctx.shadowColor = color;
+  fn();
+  ctx.shadowBlur = 0;
+}
+
+// 角丸矩形（ctx.roundRect の代替）
+function rr(x,y,w,h,r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+// ================================================================
+// キャッチ演出
+// ================================================================
+function getCatchFx(cx) {
+  // キャンバスのスクリーン座標を取得
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = rect.width / LW;
+  const screenX = rect.left + cx * scaleX;
+  const screenY = rect.top + 60;
+
+  const pop = document.createElement('div');
+  pop.style.cssText = `position:fixed;left:${screenX-20}px;top:${screenY}px;
+    font-family:var(--font-mono);font-size:22px;font-weight:900;
+    color:var(--lantern-blue);text-shadow:0 0 10px var(--lantern-blue);
+    pointer-events:none;z-index:800;animation:score-float .9s ease-out forwards`;
+  pop.textContent = 'GET!';
+  document.body.appendChild(pop);
+  setTimeout(() => pop.remove(), 900);
+}
+
+// ================================================================
+// HUD・メーター更新
+// ================================================================
+const scoreEl    = document.getElementById('score');
+const caughtEl   = document.getElementById('caught-count');
+const timeEl     = document.getElementById('time');
+const meterDots  = document.querySelectorAll('.caught-dot');
+const dropBtn    = document.getElementById('btn-drop');
+
+function updateHUD() {
+  scoreEl.textContent  = gs.score;
+  caughtEl.textContent = gs.caught;
+  meterDots.forEach((d,i) => d.classList.toggle('is-lit', i < gs.caught));
+}
+
+// ================================================================
+// ゲームループ
+// ================================================================
+function loop() {
+  update(); draw();
+  raf = requestAnimationFrame(loop);
+}
+
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  if (raf) { cancelAnimationFrame(raf); raf = null; }
+  if (timer) timer.stop();
+  initState(); updateHUD(); draw();
+  dropBtn.disabled = false;
+
+  timer = createTimer(GAME_SEC, t => {
+    timeEl.textContent = t;
+    timeEl.classList.toggle('is-urgent', t <= 10);
+  }, endGame);
+  timer.start();
+  raf = requestAnimationFrame(loop);
+}
+
+function endGame() {
+  over = true;
+  cancelAnimationFrame(raf); raf = null;
+  dropBtn.disabled = true;
+
+  if (gs.goalReached) {
+    showGameComplete({ lanternId: 2, score: gs.score })
+      .then(r => { if (r === 'retry') startGame(); });
+  } else {
+    const ov = document.createElement('div');
+    ov.className = 'game-over';
+    ov.innerHTML = `
+      <div class="game-over__bg"></div>
+      <div class="game-over__card">
+        <span class="game-over__lantern" style="filter:grayscale(1) brightness(.7);opacity:.7">🔵</span>
+        <p class="game-over__headline" style="color:var(--text-primary)">時間ぎれ！</p>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:8px">
+          ${gs.caught} / ${GOAL} 個 キャッチしました
+        </p>
+        <p class="game-over__score">${gs.score}<small style="font-size:.5em;margin-left:4px">pt</small></p>
+        <p style="color:var(--text-secondary);font-size:12px;margin-bottom:20px">
+          タイミングをもう少し！🎯
+        </p>
+        <div class="game-over__actions">
+          <button class="btn btn--primary"   id="fr">もう一度</button>
+          <button class="btn btn--secondary" id="fh">ハブに戻る</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    requestAnimationFrame(() => ov.classList.add('is-active'));
+    ov.querySelector('#fr').addEventListener('click', () => { ov.remove(); startGame(); });
+    ov.querySelector('#fh').addEventListener('click', () => { location.href = getHubUrl(); });
+  }
+}
+
+// ================================================================
+// 入力
+// ================================================================
+function onDrop() {
+  if (gs.phase !== 'idle' || over) return;
+  gs.phase = 'descend';
+  dropBtn.disabled = true;
+}
+
+dropBtn.addEventListener('click', onDrop);
+document.addEventListener('keydown', e => {
+  if (e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); onDrop(); }
+});
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+
+// ================================================================
+// 起動
+// ================================================================
+setupCanvas();
+initStars(document.getElementById('stars'));
+initState();
+draw();  // スタート画面の背景として1フレーム描画
+</script>
+
+</body>
+</html>

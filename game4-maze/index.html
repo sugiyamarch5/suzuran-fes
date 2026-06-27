@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#060818">
+  <title>灯りの迷路 | 寺子屋すずらん</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    body { overflow: hidden; height: 100vh; height: 100dvh; }
+
+    .page {
+      height: 100vh; height: 100dvh;
+      display: flex; flex-direction: column; align-items: center;
+      max-width: 480px; padding: 0; margin: 0 auto;
+    }
+
+    .game-header, .hud { width: 100%; }
+
+    /* キャンバス領域 */
+    /* ピクセルアート灯り路地背景 */
+    .game-bg {
+      position: fixed; inset: 0; z-index: -1;
+      background: url('assets/game4-bg.png') center top / cover no-repeat;
+    }
+    .game-bg::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(8,6,18,.55) 0%, rgba(8,6,18,.4) 50%, rgba(8,6,18,.8) 100%);
+    }
+    .game-header { background: rgba(8,6,18,.72); backdrop-filter: blur(6px); }
+    .hud         { background: rgba(8,6,18,.6);  backdrop-filter: blur(4px); }
+    .dpad        { background: rgba(12,10,28,.82) !important; backdrop-filter: blur(4px); }
+
+    .canvas-wrap {
+      flex: 1; min-height: 0; width: 100%;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent;
+      overflow: hidden;
+    }
+    #mc { display: block; touch-action: none; }
+
+    /* Dパッド */
+    .dpad {
+      width: 100%;
+      background: var(--sky-mid);
+      border-top: 1px solid var(--border);
+      padding: 8px 16px;
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: auto auto auto;
+      gap: 6px;
+    }
+    .dpad__btn {
+      height: 48px;
+      background: var(--sky-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 20px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: background .1s, transform .08s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .dpad__btn:active { background: var(--sky-hover); transform: scale(.9); }
+    .dpad__up     { grid-column: 2; grid-row: 1; }
+    .dpad__left   { grid-column: 1; grid-row: 2; }
+    .dpad__center { grid-column: 2; grid-row: 2;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 22px; }
+    .dpad__right  { grid-column: 3; grid-row: 2; }
+    .dpad__down   { grid-column: 2; grid-row: 3; }
+
+    /* スタート画面 */
+    .start-screen {
+      position: fixed; inset: 0; z-index: 950;
+      background: rgba(6,8,24,.95);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: var(--sp-xl);
+      gap: var(--sp-md);
+    }
+    .start-screen__icon  { font-size: 64px; animation: lantern-float 2.5s ease-in-out infinite; }
+    .start-screen__title { font-size: 24px; font-weight: 900; color: var(--text-accent); }
+    .start-screen__rule  {
+      font-size: 13px; color: var(--text-secondary);
+      line-height: 2; max-width: 280px;
+    }
+    .start-screen__rule strong { color: var(--text-accent); }
+
+    /* 残り時間が少ないときの警告色 */
+    #time.is-urgent { color: #e74c3c; animation: pulse .6s ease-in-out infinite alternate; }
+    @keyframes pulse { from { opacity: 1; } to { opacity: .5; } }
+
+    /* 壁にぶつかったときの軽い振動 */
+    @keyframes wall-hit { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+    .canvas-wrap.is-hit { animation: wall-hit .25s ease; }
+  </style>
+</head>
+<body>
+
+<div class="game-bg" aria-hidden="true"></div>
+<div id="stars" aria-hidden="true"></div>
+
+<main class="page">
+  <h1 class="sr-only">灯りの迷路 — ランタンの明かりで暗闇の迷路を抜け出すゲーム</h1>
+
+  <header class="game-header">
+    <a class="game-header__back" href="../index.html" aria-label="ハブに戻る">‹</a>
+    <span class="game-header__title">🌿 灯りの迷路</span>
+    <span class="game-header__score" id="score-disp">—</span>
+  </header>
+
+  <div class="hud">
+    <div class="hud__item">
+      <div class="hud__label">TIME</div>
+      <div class="hud__value hud__value--time" id="time">120</div>
+    </div>
+    <div class="hud__item">
+      <div class="hud__label">STEPS</div>
+      <div class="hud__value hud__value--combo" id="steps">0</div>
+    </div>
+    <div class="hud__item">
+      <div class="hud__label">GOAL</div>
+      <div class="hud__value" style="font-size:22px">✨</div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap" id="canvas-wrap">
+    <canvas id="mc"></canvas>
+  </div>
+
+  <div class="dpad" id="dpad">
+    <button class="dpad__btn dpad__up"    data-dir="N" aria-label="上へ">↑</button>
+    <button class="dpad__btn dpad__left"  data-dir="W" aria-label="左へ">←</button>
+    <div class="dpad__center" aria-hidden="true">🏮</div>
+    <button class="dpad__btn dpad__right" data-dir="E" aria-label="右へ">→</button>
+    <button class="dpad__btn dpad__down"  data-dir="S" aria-label="下へ">↓</button>
+  </div>
+</main>
+
+<!-- スタート画面 -->
+<div class="start-screen" id="start-screen">
+  <div class="start-screen__icon">🏮</div>
+  <div class="start-screen__title">灯りの迷路</div>
+  <p class="start-screen__rule">
+    真っ暗な迷路を<br>
+    ランタンの明かりだけで進もう🌿<br><br>
+    <strong>✨ ゴール</strong>を目指せ！<br>
+    <strong>120秒</strong>以内に脱出で<br>
+    <strong>金ちょうちん</strong>ゲット！
+  </p>
+  <button class="btn btn--primary" id="start-btn" style="margin-top:8px">出発！</button>
+</div>
+
+<script src="../common.js"></script>
+<script>
+'use strict';
+
+// ================================================================
+// 迷路定数
+// ================================================================
+const COLS = 11, ROWS = 11;
+const CS   = 26;   // セルサイズ (logical px)
+const CW   = COLS * CS;
+const CH   = ROWS * CS;
+
+const N = 1, S = 2, E = 4, W = 8;
+const OPP = { [N]: S, [S]: N, [E]: W, [W]: E };
+const DX  = { [N]: 0, [S]: 0, [E]: 1, [W]: -1 };
+const DY  = { [N]: -1,[S]: 1, [E]: 0, [W]: 0  };
+
+const GAME_SEC = 120;
+// 光の半径: 小さいほど難しい（2.8 = ほどよく怖い）
+const LIGHT_R  = Math.floor(CS * 2.8);
+
+// ================================================================
+// 迷路生成 — Recursive Backtracker (DFS)
+// ================================================================
+function generateMaze() {
+  const cells = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
+
+  function carve(x, y) {
+    const dirs = [N, S, E, W].sort(() => Math.random() - 0.5);
+    for (const d of dirs) {
+      const nx = x + DX[d], ny = y + DY[d];
+      if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && cells[ny][nx] === 0) {
+        cells[y][x] |= d;
+        cells[ny][nx] |= OPP[d];
+        carve(nx, ny);
+      }
+    }
+  }
+  carve(0, 0);
+  return cells;
+}
+
+// ================================================================
+// Canvas セットアップ
+// ================================================================
+let canvas, ctx, fogCanvas, fogCtx, scale = 1;
+
+function setupCanvas() {
+  canvas    = document.getElementById('mc');
+  ctx       = canvas.getContext('2d');
+  fogCanvas = document.createElement('canvas');
+  fogCtx    = fogCanvas.getContext('2d');
+
+  canvas.width    = CW;
+  canvas.height   = CH;
+  fogCanvas.width = CW;
+  fogCanvas.height= CH;
+
+  applyScale();
+  window.addEventListener('resize', applyScale, { passive: true });
+}
+
+function applyScale() {
+  const wrap = document.getElementById('canvas-wrap');
+  const s = Math.min(wrap.clientWidth / CW, wrap.clientHeight / CH, 1.6);
+  scale = s;
+  canvas.style.width  = (CW * s) + 'px';
+  canvas.style.height = (CH * s) + 'px';
+}
+
+// ================================================================
+// ゲーム状態
+// ================================================================
+let maze, px, py, steps, goalReached, gameOver;
+let timer = null;
+let raf   = null;
+let animFrame = 0; // ゴール演出用フレームカウンタ
+
+function initState() {
+  maze = generateMaze();
+  px   = 0; py = 0;
+  steps = 0; goalReached = false; gameOver = false;
+  animFrame = 0;
+  document.getElementById('steps').textContent    = '0';
+  document.getElementById('time').textContent     = GAME_SEC;
+  document.getElementById('time').classList.remove('is-urgent');
+  document.getElementById('score-disp').textContent = '—';
+}
+
+// ================================================================
+// 描画
+// ================================================================
+function draw(goalPulse) {
+  const pcx = px * CS + CS / 2;
+  const pcy = py * CS + CS / 2;
+
+  // 背景
+  ctx.fillStyle = '#07091c';
+  ctx.fillRect(0, 0, CW, CH);
+
+  // ゴール周囲グロー（常時）
+  drawGoalGlow(goalPulse || 0);
+
+  // 迷路の壁
+  drawWalls();
+
+  // スタートマーク
+  drawStartMark();
+
+  // プレイヤー（ランタン）
+  drawPlayer(pcx, pcy);
+
+  // 霧のオーバーレイ
+  drawFog(pcx, pcy, goalPulse || 0);
+
+  // ゴールアイコン（霧の上に描画して常に見えるように）
+  drawGoalIcon();
+}
+
+function drawWalls() {
+  ctx.strokeStyle = 'rgba(110,140,200,0.75)';
+  ctx.lineWidth   = 1.8;
+  ctx.lineCap     = 'square';
+
+  // 外枠
+  ctx.strokeRect(0.9, 0.9, CW - 1.8, CH - 1.8);
+
+  // 内部の壁
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const cell = maze[y][x];
+      const bx   = x * CS, by = y * CS;
+
+      if (!(cell & E) && x < COLS - 1) {
+        ctx.beginPath();
+        ctx.moveTo(bx + CS, by);
+        ctx.lineTo(bx + CS, by + CS);
+        ctx.stroke();
+      }
+      if (!(cell & S) && y < ROWS - 1) {
+        ctx.beginPath();
+        ctx.moveTo(bx, by + CS);
+        ctx.lineTo(bx + CS, by + CS);
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+function drawStartMark() {
+  ctx.font = `${CS * 0.6}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.globalAlpha = 0.4;
+  ctx.fillText('🏠', CS / 2, CS / 2);
+  ctx.globalAlpha = 1;
+}
+
+function drawGoalGlow(pulse) {
+  const gx = (COLS - 1) * CS + CS / 2;
+  const gy = (ROWS - 1) * CS + CS / 2;
+  const r  = CS * 1.8 + pulse;
+  const g  = ctx.createRadialGradient(gx, gy, 0, gx, gy, r);
+  g.addColorStop(0, 'rgba(241,196,15,0.45)');
+  g.addColorStop(0.5,'rgba(241,196,15,0.15)');
+  g.addColorStop(1, 'rgba(241,196,15,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, CW, CH);
+}
+
+function drawGoalIcon() {
+  const gx = (COLS - 1) * CS + CS / 2;
+  const gy = (ROWS - 1) * CS + CS / 2;
+  ctx.font = `${CS * 0.82}px serif`;
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowBlur   = 14;
+  ctx.shadowColor  = '#ffd700';
+  ctx.fillStyle    = 'white';
+  ctx.fillText('✨', gx, gy);
+  ctx.shadowBlur   = 0;
+}
+
+function drawPlayer(cx, cy) {
+  // ランタンの暖かいグロー
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, CS * 0.8);
+  g.addColorStop(0,   'rgba(245,200,66,0.85)');
+  g.addColorStop(0.4, 'rgba(245,140,30,0.4)');
+  g.addColorStop(1,   'rgba(245,140,30,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(cx, cy, CS * 0.8, 0, Math.PI * 2); ctx.fill();
+
+  // プレイヤードット
+  ctx.shadowBlur  = 10;
+  ctx.shadowColor = '#f5c842';
+  ctx.fillStyle   = '#f5c842';
+  ctx.beginPath(); ctx.arc(cx, cy, CS * 0.28, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur  = 0;
+}
+
+function drawFog(cx, cy, pulse) {
+  const lr = LIGHT_R + pulse * 0.6;
+
+  // fogCanvas: 暗いオーバーレイ → 中央を切り抜く
+  fogCtx.clearRect(0, 0, CW, CH);
+  fogCtx.fillStyle = 'rgba(4,6,20,0.94)';
+  fogCtx.fillRect(0, 0, CW, CH);
+
+  // destination-out でプレイヤー周囲を透明化
+  fogCtx.globalCompositeOperation = 'destination-out';
+  const grad = fogCtx.createRadialGradient(cx, cy, 0, cx, cy, lr);
+  grad.addColorStop(0,    'rgba(0,0,0,1)');
+  grad.addColorStop(0.5,  'rgba(0,0,0,0.95)');
+  grad.addColorStop(0.8,  'rgba(0,0,0,0.55)');
+  grad.addColorStop(1,    'rgba(0,0,0,0)');
+  fogCtx.fillStyle = grad;
+  fogCtx.beginPath();
+  fogCtx.arc(cx, cy, lr, 0, Math.PI * 2);
+  fogCtx.fill();
+  fogCtx.globalCompositeOperation = 'source-over';
+
+  ctx.drawImage(fogCanvas, 0, 0);
+}
+
+// ================================================================
+// ゴール演出ループ
+// ================================================================
+function goalLoop() {
+  animFrame++;
+  const pulse = Math.sin(animFrame * 0.15) * CS * 0.7 + CS * 0.4;
+  draw(pulse);
+  raf = requestAnimationFrame(goalLoop);
+}
+
+// ================================================================
+// 移動
+// ================================================================
+function move(dir) {
+  if (gameOver || goalReached) return;
+  if (!(maze[py][px] & dir)) {
+    // 壁: キャンバス振動
+    const wrap = document.getElementById('canvas-wrap');
+    wrap.classList.remove('is-hit');
+    void wrap.offsetWidth; // reflow
+    wrap.classList.add('is-hit');
+    return;
+  }
+  px += DX[dir];
+  py += DY[dir];
+  steps++;
+  document.getElementById('steps').textContent = steps;
+  draw();
+
+  if (px === COLS - 1 && py === ROWS - 1) {
+    onGoal();
+  }
+}
+
+function onGoal() {
+  goalReached = true;
+  if (timer) timer.stop();
+
+  const remaining = parseInt(document.getElementById('time').textContent, 10);
+  const score = 100 + remaining * 2 + Math.max(0, 300 - steps);
+  document.getElementById('score-disp').textContent = score + 'pt';
+
+  // ゴール演出開始
+  raf = requestAnimationFrame(goalLoop);
+
+  setTimeout(() => {
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    draw(CS * 0.8);
+    showGameComplete({ lanternId: 4, score })
+      .then(r => { if (r === 'retry') startGame(); });
+  }, 1200);
+}
+
+// ================================================================
+// 時間切れ
+// ================================================================
+function onTimeUp() {
+  if (goalReached) return;
+  gameOver = true;
+  showFail();
+}
+
+function showFail() {
+  const ov = document.createElement('div');
+  ov.className = 'game-over';
+  ov.innerHTML = `
+    <div class="game-over__bg"></div>
+    <div class="game-over__card">
+      <span class="game-over__lantern" style="filter:grayscale(1) brightness(.6);opacity:.65">✨</span>
+      <p class="game-over__headline" style="color:var(--text-primary)">時間ぎれ！</p>
+      <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">
+        出口までもう少し…<br>もう一度挑戦しよう🌿
+      </p>
+      <div class="game-over__actions">
+        <button class="btn btn--primary"   id="fr">もう一度</button>
+        <button class="btn btn--secondary" id="fh">ハブに戻る</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => ov.classList.add('is-active'));
+  ov.querySelector('#fr').addEventListener('click', () => { ov.remove(); startGame(); });
+  ov.querySelector('#fh').addEventListener('click', () => { location.href = getHubUrl(); });
+}
+
+// ================================================================
+// ゲーム起動
+// ================================================================
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  document.querySelectorAll('.game-over').forEach(e => e.remove());
+
+  if (timer) timer.stop();
+  if (raf)   { cancelAnimationFrame(raf); raf = null; }
+
+  initState();
+  draw();
+
+  timer = createTimer(GAME_SEC,
+    t => {
+      document.getElementById('time').textContent = t;
+      document.getElementById('time').classList.toggle('is-urgent', t <= 15);
+    },
+    onTimeUp
+  );
+  timer.start();
+}
+
+// ================================================================
+// 入力
+// ================================================================
+// Dパッド
+const DIR_MAP = { N, S, E, W };
+document.querySelectorAll('.dpad__btn').forEach(btn => {
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    move(DIR_MAP[btn.dataset.dir]);
+  });
+});
+
+// キーボード
+document.addEventListener('keydown', e => {
+  const k = { ArrowUp: N, ArrowDown: S, ArrowRight: E, ArrowLeft: W,
+               w: N, s: S, d: E, a: W };
+  if (k[e.key]) { e.preventDefault(); move(k[e.key]); }
+});
+
+// スワイプ
+let tx0 = null, ty0 = null;
+document.addEventListener('touchstart', e => {
+  tx0 = e.touches[0].clientX;
+  ty0 = e.touches[0].clientY;
+}, { passive: true });
+document.addEventListener('touchend', e => {
+  if (tx0 === null) return;
+  const dx = e.changedTouches[0].clientX - tx0;
+  const dy = e.changedTouches[0].clientY - ty0;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) { tx0 = null; return; }
+  if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? E : W);
+  else                              move(dy > 0 ? S : N);
+  tx0 = null;
+}, { passive: true });
+
+// ================================================================
+// 初期化
+// ================================================================
+setupCanvas();
+initStars(document.getElementById('stars'));
+
+// スタート画面の背景として静的に一度描画
+maze = generateMaze(); px = 0; py = 0;
+goalReached = false; gameOver = true; // 起動前は移動不可
+draw();
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+</script>
+</body>
+</html>

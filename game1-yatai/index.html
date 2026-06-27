@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#060818">
+  <title>屋台スピードパズル | 寺子屋すずらん</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    /* ============================================================
+       屋台スピードパズル — ゲーム固有スタイル
+       ============================================================ */
+    body { overflow: hidden; height: 100vh; height: 100dvh; }
+
+    .page {
+      height: 100vh; height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      max-width: 480px;
+    }
+
+    /* --- 赤ちょうちんメーター --- */
+    .lantern-meter { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .lantern-meter__label { font-size: 9px; letter-spacing: .08em; color: var(--text-secondary); }
+    .lantern-meter__row { display: flex; gap: 3px; }
+    .lantern-meter__dot {
+      font-size: 16px; line-height: 1;
+      opacity: .25; filter: grayscale(1) brightness(.6);
+      transition: opacity .35s, filter .35s, transform .35s;
+    }
+    .lantern-meter__dot.is-lit {
+      opacity: 1; filter: drop-shadow(0 0 6px var(--lantern-red));
+      transform: scale(1.15);
+    }
+
+    /* --- プレイフィールド --- */
+    .playfield {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      padding: var(--sp-md);
+      gap: var(--sp-md);
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* お客さん + 注文吹き出し */
+    .customer {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--sp-md);
+    }
+    .customer__avatar {
+      font-size: 48px; line-height: 1;
+      flex-shrink: 0;
+      animation: customer-in .4s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes customer-in { 0% { transform: translateX(-30px) scale(.5); opacity:0; } 100% { transform: none; opacity:1; } }
+
+    .order {
+      flex: 1;
+      background: var(--lantern-secret, #e8dfc8);
+      color: #2a2418;
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      position: relative;
+      box-shadow: 0 4px 16px rgba(0,0,0,.3);
+    }
+    .order::before {
+      content: '';
+      position: absolute;
+      left: -7px; top: 16px;
+      border: 7px solid transparent;
+      border-right-color: var(--lantern-secret, #e8dfc8);
+      border-left: 0;
+    }
+    .order__name { font-size: 13px; font-weight: 800; margin-bottom: 6px; display:flex; align-items:center; gap:6px; }
+    .order__steps { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .order__step {
+      font-size: 22px; line-height: 1;
+      width: 34px; height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,.06);
+      border-radius: 8px;
+      transition: all .2s;
+    }
+    .order__step.is-done   { background: rgba(46,204,113,.25); }
+    .order__step.is-active { background: rgba(245,200,66,.35); box-shadow: 0 0 0 2px rgba(245,160,40,.6); animation: step-pulse 1s ease-in-out infinite; }
+    @keyframes step-pulse { 50% { box-shadow: 0 0 0 4px rgba(245,160,40,.3); } }
+    .order__arrow { font-size: 12px; color: #8a7d60; }
+
+    /* トレイ（調理中の盛り付け） */
+    .tray-wrap {
+      flex: 1;
+      display: flex;
+      align-items: flex-end;     /* 下寄せ：女の子の顔に被らないように */
+      justify-content: center;
+      min-height: 0;
+      padding-bottom: 4px;
+    }
+    .tray {
+      width: 58%;
+      max-width: 200px;
+      aspect-ratio: 16 / 7;
+      background: linear-gradient(180deg, rgba(58,42,28,.7), rgba(37,24,14,.8));
+      backdrop-filter: blur(2px);
+      border: 3px solid rgba(74,54,36,.85);
+      border-radius: 12px;
+      box-shadow: inset 0 4px 12px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      position: relative;
+      transition: transform .15s, box-shadow .25s;
+    }
+    .tray.is-ready {
+      box-shadow: inset 0 4px 12px rgba(0,0,0,.5), 0 0 0 3px var(--text-accent), 0 0 24px rgba(245,200,66,.5);
+    }
+    .tray.is-shake { animation: shake .35s; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+
+    .tray__item {
+      font-size: 38px; line-height: 1;
+      animation: drop-in .3s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes drop-in { 0% { transform: translateY(-40px) scale(0); opacity:0; } 100% { transform:none; opacity:1; } }
+    .tray__hint { color: #6a5640; font-size: 12px; letter-spacing: .1em; }
+
+    /* 提供サイン */
+    .serve-arrow {
+      position: absolute;
+      bottom: 8px; left: 50%; transform: translateX(-50%);
+      color: var(--text-accent); font-size: 12px; font-weight: 800;
+      letter-spacing: .08em;
+      display: none;
+    }
+    .tray.is-ready .serve-arrow { display: block; animation: arrow-bounce 1s ease-in-out infinite; }
+    @keyframes arrow-bounce { 50% { transform: translateX(-50%) translateY(-4px); } }
+
+    /* --- 食材グリッド --- */
+    .ingredients {
+      background: var(--sky-mid);
+      border-top: 1px solid var(--border);
+      padding: var(--sp-md);
+      padding-bottom: max(var(--sp-md), env(safe-area-inset-bottom));
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .ingredient {
+      aspect-ratio: 1;
+      background: var(--sky-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      touch-action: manipulation;
+      transition: transform .1s, box-shadow .2s, border-color .2s;
+    }
+    .ingredient:active { transform: scale(.9); }
+    .ingredient.is-next {
+      border-color: var(--text-accent);
+      box-shadow: 0 0 0 2px rgba(245,200,66,.4), 0 0 16px rgba(245,200,66,.25);
+    }
+    .ingredient.is-wrong { animation: shake .35s; border-color: var(--lantern-red); }
+    .ingredient__icon { font-size: 28px; line-height: 1; }
+    .ingredient__name { font-size: 9px; color: var(--text-secondary); line-height: 1.1; text-align: center; }
+
+    /* --- スコアポップ --- */
+    .score-pop {
+      position: fixed;
+      font-family: var(--font-mono);
+      font-size: 24px; font-weight: 900;
+      color: var(--text-accent);
+      text-shadow: 0 2px 8px rgba(0,0,0,.6);
+      pointer-events: none;
+      z-index: 800;
+      animation: score-float 0.9s ease-out forwards;
+    }
+    @keyframes score-float { 0%{opacity:0;transform:translateY(0) scale(.6)} 20%{opacity:1} 100%{opacity:0;transform:translateY(-60px) scale(1.1)} }
+
+    /* キラキラ */
+    .spark { position: fixed; pointer-events: none; z-index: 790; font-size: 20px; animation: spark-fly .7s ease-out forwards; }
+    @keyframes spark-fly { 0%{opacity:1;transform:translate(0,0) scale(.4)} 100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1.1)} }
+
+    /* お客さんのハート */
+    .heart-pop {
+      position: absolute; top: -10px; left: 40px;
+      font-size: 28px; pointer-events: none;
+      animation: heart-up .8s ease-out forwards;
+    }
+    @keyframes heart-up { 0%{opacity:0;transform:translateY(0) scale(.5)} 30%{opacity:1} 100%{opacity:0;transform:translateY(-40px) scale(1.2)} }
+
+    /* --- ピクセルアート背景 --- */
+    .game-bg {
+      position: fixed; inset: 0; z-index: -1;
+      background: url('assets/game1-bg.png') center top / cover no-repeat;
+    }
+    .game-bg::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(6,8,24,.45) 0%, rgba(6,8,24,.25) 50%, rgba(6,8,24,.7) 100%);
+    }
+
+    /* 背景がある場合にヘッダー・HUDを半透明に */
+    .game-header { background: rgba(6,8,24,.75); backdrop-filter: blur(6px); }
+    .hud         { background: rgba(6,8,24,.65); backdrop-filter: blur(4px); }
+    .ingredients { background: rgba(10,14,36,.88); backdrop-filter: blur(4px); }
+
+    /* ピクセルアートアイコン */
+    .ingredient__icon--img {
+      width: 52px; height: 52px;
+      object-fit: contain;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,.4));
+    }
+
+    /* ingredient カードをピクセルアート風に */
+    .ingredient {
+      background: rgba(20,28,60,.8);
+      border-color: rgba(90,110,180,.5);
+    }
+    .ingredient.is-next {
+      background: rgba(40,50,100,.9);
+    }
+
+    /* スタート画面 */
+    .start-screen {
+      position: fixed; inset: 0; z-index: 950;
+      background: rgba(6,8,24,.92);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: var(--sp-xl);
+      gap: var(--sp-md);
+    }
+    .start-screen__icon { font-size: 64px; }
+    .start-screen__title { font-size: 22px; font-weight: 900; color: var(--text-accent); }
+    .start-screen__rule { font-size: 13px; color: var(--text-secondary); line-height: 1.8; }
+  </style>
+</head>
+<body>
+
+<div class="game-bg" aria-hidden="true"></div>
+<div id="stars" aria-hidden="true"></div>
+
+<main class="page">
+  <h1 class="sr-only">屋台スピードパズル — 食材を正しい順にタップして料理を提供し、赤ちょうちんを集めるゲーム</h1>
+
+  <header class="game-header">
+    <a class="game-header__back" href="../index.html" aria-label="ハブに戻る">‹</a>
+    <span class="game-header__title">🍧 屋台スピードパズル</span>
+    <span class="game-header__score" id="score">0</span>
+  </header>
+
+  <div class="hud">
+    <div class="hud__item">
+      <div class="hud__label">TIME</div>
+      <div class="hud__value hud__value--time" id="time">60</div>
+    </div>
+    <div class="hud__item">
+      <div class="hud__label">COMBO</div>
+      <div class="hud__value hud__value--combo" id="combo">0</div>
+    </div>
+    <div class="hud__item lantern-meter">
+      <span class="lantern-meter__label">赤ちょうちんの灯り</span>
+      <div class="lantern-meter__row" id="meter"></div>
+    </div>
+  </div>
+
+  <section class="playfield" id="playfield">
+    <div class="customer">
+      <span class="customer__avatar" id="avatar">🧑</span>
+      <div class="order">
+        <div class="order__name" id="order-name">—</div>
+        <div class="order__steps" id="order-steps"></div>
+      </div>
+    </div>
+
+    <div class="tray-wrap">
+      <div class="tray" id="tray">
+        <span class="tray__hint" id="tray-hint">食材をえらんでね</span>
+        <span class="serve-arrow">↑ 上にスワイプで提供！</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="ingredients" id="ingredients" aria-label="食材"></section>
+</main>
+
+<!-- スタート画面 -->
+<div class="start-screen" id="start-screen">
+  <div class="start-screen__icon">🍧</div>
+  <div class="start-screen__title">屋台スピードパズル</div>
+  <p class="start-screen__rule">
+    お客さんの注文どおりに<br>
+    食材を<strong style="color:var(--text-accent)">正しい順番</strong>でタップ！<br>
+    そろったら<strong style="color:var(--text-accent)">上にスワイプ</strong>で提供🍧<br><br>
+    制限時間内に <strong style="color:var(--lantern-red)">5回</strong> 提供すると<br>
+    🏮 赤ちょうちん ゲット！
+  </p>
+  <button class="btn btn--primary" id="start-btn">スタート！</button>
+</div>
+
+<script src="../common.js"></script>
+<script>
+'use strict';
+
+// ============================================================
+// データ定義
+// ============================================================
+const INGREDIENTS = [
+  { id:'ice',      name:'氷',           icon:'🧊', img:'assets/ice.png' },
+  { id:'syrup',    name:'いちごシロップ', icon:'🍓', img:'assets/syrup.png' },
+  { id:'spoon',    name:'スプーン',      icon:'🥄', img:'assets/spoon.png' },
+  { id:'ramen',    name:'ラーメンだれ',  icon:'🧴', img:'assets/ramen.png' },
+  { id:'apple',    name:'りんごあめ',    icon:'🍎', img:'assets/apple.png' },
+  { id:'yakisoba', name:'やきそば',      icon:'🍝', img:'assets/yakisoba.png' },
+  { id:'takoyaki', name:'たこ焼き',      icon:'🐙', img:'assets/takoyaki.png' },
+  { id:'sauce',    name:'ソース',        icon:'🥫', img:'assets/sauce.png' },
+];
+const ING = Object.fromEntries(INGREDIENTS.map(i => [i.id, i]));
+
+const RECIPES = [
+  { name:'いちごかき氷',   icon:'🍧', steps:['ice','syrup','spoon'] },
+  { name:'たこ焼き',       icon:'🐙', steps:['takoyaki','sauce'] },
+  { name:'やきそば',       icon:'🍝', steps:['yakisoba','sauce'] },
+  { name:'屋台ラーメン',   icon:'🍜', steps:['ramen','spoon'] },
+  { name:'りんごあめ',     icon:'🍎', steps:['apple'] },
+  { name:'いちごミルク氷', icon:'🥛', steps:['ice','syrup','syrup'] },
+  { name:'デラックスかき氷',icon:'🍧', steps:['ice','syrup','apple','spoon'] },
+];
+
+const AVATARS = ['🐱','🐶','🐰','🐻','🐼','🦊','🐨','🐯','🦁','🐸','🐹','🐮','🐷','🐧','🐥'];
+
+const GOAL    = 5;   // 提供回数の目標（達成で赤ちょうちん）
+const TIME    = 60;  // 制限時間（秒）
+
+// ============================================================
+// 状態
+// ============================================================
+const state = { score:0, combo:0, served:0, order:null, progress:0, busy:false };
+let goalReached = false;
+let timer = null;
+
+// ============================================================
+// DOM
+// ============================================================
+const $ = id => document.getElementById(id);
+const els = {
+  score:$('score'), time:$('time'), combo:$('combo'), meter:$('meter'),
+  avatar:$('avatar'), orderName:$('order-name'), orderSteps:$('order-steps'),
+  tray:$('tray'), trayHint:$('tray-hint'), ingredients:$('ingredients'),
+  playfield:$('playfield'),
+};
+
+// ============================================================
+// 初期化
+// ============================================================
+initStars($('stars'));
+renderMeter();
+renderIngredients();
+
+$('start-btn').addEventListener('click', startGame);
+
+function startGame() {
+  $('start-screen').style.display = 'none';
+  state.score = state.combo = state.served = state.progress = 0;
+  goalReached = false; state.busy = false;
+  renderScore(); renderCombo(); renderMeter();
+  newOrder();
+  timer = createTimer(TIME, t => {
+    els.time.textContent = t;
+    els.time.classList.toggle('is-urgent', t <= 10);
+  }, endGame);
+  timer.start();
+}
+
+// ============================================================
+// 描画
+// ============================================================
+function renderScore() { els.score.textContent = state.score; }
+function renderCombo() { els.combo.textContent = state.combo; }
+
+function renderMeter() {
+  els.meter.innerHTML = '';
+  for (let i = 0; i < GOAL; i++) {
+    const d = document.createElement('span');
+    d.className = 'lantern-meter__dot' + (i < state.served ? ' is-lit' : '');
+    d.textContent = '🏮';
+    els.meter.appendChild(d);
+  }
+}
+
+function renderIngredients() {
+  els.ingredients.innerHTML = '';
+  INGREDIENTS.forEach(ing => {
+    const b = document.createElement('button');
+    b.className = 'ingredient';
+    b.dataset.id = ing.id;
+    b.setAttribute('aria-label', ing.name);
+    b.innerHTML = `<img class="ingredient__icon--img" src="${ing.img}" alt="${ing.name}" onerror="this.outerHTML='<span class=\\"ingredient__icon\\">${ing.icon}</span>'"><span class="ingredient__name">${ing.name}</span>`;
+    b.addEventListener('click', () => tapIngredient(ing.id, b));
+    els.ingredients.appendChild(b);
+  });
+}
+
+function renderOrder() {
+  const o = state.order;
+  els.orderName.innerHTML = `<span>${o.icon}</span> ${o.name}`;
+  els.orderSteps.innerHTML = '';
+  o.steps.forEach((sid, i) => {
+    if (i > 0) {
+      const arr = document.createElement('span');
+      arr.className = 'order__arrow'; arr.textContent = '▶';
+      els.orderSteps.appendChild(arr);
+    }
+    const s = document.createElement('span');
+    s.className = 'order__step';
+    if (i < state.progress) s.classList.add('is-done');
+    else if (i === state.progress) s.classList.add('is-active');
+    s.textContent = ING[sid].icon;
+    els.orderSteps.appendChild(s);
+  });
+  highlightNext();
+}
+
+function renderTray() {
+  els.tray.classList.remove('is-ready');
+  const built = state.order.steps.slice(0, state.progress);
+  els.tray.querySelectorAll('.tray__item').forEach(e => e.remove());
+  if (built.length === 0) {
+    els.trayHint.style.display = '';
+  } else {
+    els.trayHint.style.display = 'none';
+    built.forEach(sid => {
+      const it = document.createElement('span');
+      it.className = 'tray__item'; it.textContent = ING[sid].icon;
+      els.tray.insertBefore(it, els.tray.querySelector('.serve-arrow'));
+    });
+  }
+}
+
+function highlightNext() {
+  const need = isReady() ? null : state.order.steps[state.progress];
+  els.ingredients.querySelectorAll('.ingredient').forEach(b => {
+    b.classList.toggle('is-next', b.dataset.id === need);
+  });
+}
+
+// ============================================================
+// ゲームロジック
+// ============================================================
+function isReady() { return state.order && state.progress >= state.order.steps.length; }
+
+function newOrder() {
+  // 序盤はやさしく（手順2以下）、4回提供後から長い手順も登場
+  const pool = state.served < 3
+    ? RECIPES.filter(r => r.steps.length <= 2)
+    : RECIPES;
+  state.order = pool[Math.floor(Math.random() * pool.length)];
+  state.progress = 0;
+  els.avatar.textContent = AVATARS[Math.floor(Math.random() * AVATARS.length)];
+  els.avatar.style.animation = 'none'; void els.avatar.offsetWidth;
+  els.avatar.style.animation = '';
+  renderOrder();
+  renderTray();
+}
+
+function tapIngredient(id, btn) {
+  if (state.busy || !state.order || isReady()) return;
+  const need = state.order.steps[state.progress];
+  if (id === need) {
+    state.progress++;
+    renderOrder();
+    renderTray();
+    if (isReady()) {
+      els.tray.classList.add('is-ready');
+      els.trayHint.style.display = 'none';
+    }
+  } else {
+    // お手つき：コンボリセット＋フィードバック（時間ペナルティなし＝やさしめ）
+    state.combo = 0; renderCombo();
+    btn.classList.remove('is-wrong'); void btn.offsetWidth; btn.classList.add('is-wrong');
+    els.tray.classList.remove('is-shake'); void els.tray.offsetWidth; els.tray.classList.add('is-shake');
+  }
+}
+
+function serve() {
+  if (!isReady() || state.busy) return;
+  state.busy = true;
+  state.combo++;
+  state.served++;
+  const pts = 100 * state.order.steps.length + state.combo * 20;
+  state.score += pts;
+  renderScore(); renderCombo(); renderMeter();
+  serveFx(pts);
+
+  if (state.served >= GOAL && !goalReached) {
+    goalReached = true;
+    showToast('🏮 赤ちょうちん ゲット！');
+  }
+
+  setTimeout(() => { state.busy = false; newOrder(); }, 480);
+}
+
+function endGame() {
+  state.busy = true;
+  if (goalReached) {
+    showGameComplete({ lanternId: 1, score: state.score });
+  } else {
+    showFail();
+  }
+}
+
+// ============================================================
+// 演出
+// ============================================================
+function serveFx(pts) {
+  const rect = els.tray.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  // スコアポップ
+  const pop = document.createElement('div');
+  pop.className = 'score-pop'; pop.textContent = '+' + pts;
+  pop.style.left = (cx - 24) + 'px'; pop.style.top = (cy - 20) + 'px';
+  document.body.appendChild(pop);
+  setTimeout(() => pop.remove(), 900);
+
+  // キラキラ
+  const marks = ['✨','⭐','🌟','💫'];
+  for (let i = 0; i < 8; i++) {
+    const s = document.createElement('div');
+    s.className = 'spark'; s.textContent = marks[i % marks.length];
+    s.style.left = cx + 'px'; s.style.top = cy + 'px';
+    const ang = (Math.PI * 2 * i) / 8;
+    s.style.setProperty('--dx', Math.cos(ang) * 70 + 'px');
+    s.style.setProperty('--dy', Math.sin(ang) * 70 + 'px');
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 700);
+  }
+
+  // お客さんのハート
+  const h = document.createElement('div');
+  h.className = 'heart-pop'; h.textContent = '❤️';
+  els.playfield.querySelector('.customer').appendChild(h);
+  setTimeout(() => h.remove(), 800);
+}
+
+function showFail() {
+  const overlay = document.createElement('div');
+  overlay.className = 'game-over';
+  overlay.innerHTML = `
+    <div class="game-over__bg"></div>
+    <div class="game-over__card">
+      <span class="game-over__lantern" style="filter:grayscale(1) brightness(.7);opacity:.7">🏮</span>
+      <p class="game-over__headline" style="color:var(--text-primary)">時間ぎれ！</p>
+      <p style="color:var(--text-secondary);font-size:13px;margin-bottom:8px">
+        ${state.served} / ${GOAL} 回 提供しました
+      </p>
+      <p class="game-over__score">${state.score}<small style="font-size:.5em;margin-left:4px">pt</small></p>
+      <p style="color:var(--text-secondary);font-size:12px;margin-bottom:20px">あと少し！もう一度チャレンジ🔥</p>
+      <div class="game-over__actions">
+        <button class="btn btn--primary" id="fail-retry">もう一度</button>
+        <button class="btn btn--secondary" id="fail-hub">ハブに戻る</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('is-active'));
+  overlay.querySelector('#fail-retry').addEventListener('click', () => { overlay.remove(); startGame(); });
+  overlay.querySelector('#fail-hub').addEventListener('click', () => { location.href = getHubUrl(); });
+}
+
+// showGameComplete の「もう一度」を拾って再スタート
+const _origComplete = showGameComplete;
+window.showGameComplete = function(opts) {
+  return _origComplete(opts).then(r => { if (r === 'retry') startGame(); });
+};
+
+// ============================================================
+// 提供操作：上スワイプ ＋ トレイタップ
+// ============================================================
+els.tray.addEventListener('click', () => { if (isReady()) serve(); });
+
+let touchStartY = null;
+els.playfield.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+els.playfield.addEventListener('touchend', e => {
+  if (touchStartY === null) return;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (dy < -40 && isReady()) serve();
+  touchStartY = null;
+}, { passive: true });
+
+// 完成後のスペース/Enterでも提供（PC確認用）
+document.addEventListener('keydown', e => {
+  if ((e.key === ' ' || e.key === 'Enter') && isReady()) { e.preventDefault(); serve(); }
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,457 @@
+/* ================================================================
+   寺子屋すずらん 夜市ゲーム — 共通スタイル
+   全ゲームページがこのCSSをインポートして使用する
+   ================================================================ */
+
+/* ----- Design Tokens ----- */
+:root {
+  /* Night sky */
+  --sky-deep:    #060818;
+  --sky-mid:     #0d1128;
+  --sky-surface: #161c3c;
+  --sky-card:    #1e2450;
+  --sky-hover:   #252c5c;
+
+  /* Lantern colors */
+  --lantern-red:    #e74c3c;
+  --lantern-blue:   #4a9de0;
+  --lantern-purple: #9b59b6;
+  --lantern-gold:   #f1c40f;
+  --lantern-secret: #e8dfc8;
+  --lantern-unlit:  rgba(255,255,255,0.06);
+
+  /* Text */
+  --text-primary:   #f0e6d3;
+  --text-secondary: #7a8aaa;
+  --text-accent:    #f5c842;
+
+  /* UI */
+  --border:      rgba(255,255,255,0.08);
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   24px;
+  --radius-full: 999px;
+
+  /* Spacing */
+  --sp-xs:  4px;
+  --sp-sm:  8px;
+  --sp-md:  16px;
+  --sp-lg:  24px;
+  --sp-xl:  32px;
+  --sp-2xl: 48px;
+
+  /* Typography */
+  --font-jp:   'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Noto Sans JP', sans-serif;
+  --font-mono: 'Courier New', monospace;
+
+  /* Transition */
+  --t: 0.22s ease;
+  --t-slow: 0.45s ease;
+}
+
+/* ----- Reset ----- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-tap-highlight-color: transparent; font-size: 16px; }
+body {
+  font-family: var(--font-jp);
+  background: var(--sky-deep);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; border: none; background: none; font-family: inherit; }
+
+/* ----- Stars Background ----- */
+#stars {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.star {
+  position: absolute;
+  border-radius: 50%;
+  background: white;
+  animation: twinkle var(--star-dur, 3s) ease-in-out infinite var(--star-del, 0s);
+}
+@keyframes twinkle {
+  0%,100% { opacity: var(--star-lo, 0.25); transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.5); }
+}
+
+/* ----- Accessibility ----- */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0;
+  margin: -1px; overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}
+
+/* ================================================================
+   Hub Page
+   ================================================================ */
+.hub {
+  position: relative;
+  z-index: 1;
+  max-width: 428px;
+  margin: 0 auto;
+  padding: var(--sp-xl) var(--sp-md) var(--sp-2xl);
+}
+
+/* --- Header --- */
+.hub__header { text-align: center; margin-bottom: var(--sp-xl); }
+
+.hub__tagline {
+  font-size: 11px;
+  color: var(--text-secondary);
+  letter-spacing: 0.14em;
+  margin-bottom: var(--sp-sm);
+}
+
+.hub__title {
+  font-size: clamp(30px, 9vw, 44px);
+  font-weight: 900;
+  color: var(--text-accent);
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 40px rgba(245,200,66,.55), 0 2px 4px rgba(0,0,0,.8);
+  line-height: 1.15;
+  margin-bottom: var(--sp-xs);
+}
+
+.hub__subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  letter-spacing: 0.1em;
+  margin-bottom: var(--sp-md);
+}
+
+.hub__badge {
+  display: inline-block;
+  background: rgba(245,200,66,.12);
+  border: 1px solid rgba(245,200,66,.3);
+  color: var(--text-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 3px 12px;
+  border-radius: var(--radius-full);
+}
+
+/* --- Lantern Progress --- */
+.hub__lanterns {
+  background: var(--sky-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-md) var(--sp-md);
+  margin-bottom: var(--sp-xl);
+}
+
+.hub__lanterns-label {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+  letter-spacing: 0.1em;
+  margin-bottom: var(--sp-md);
+}
+
+.lantern-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-sm);
+}
+
+.lantern {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  padding: 8px 2px;
+  border-radius: var(--radius-sm);
+  opacity: 0.22;
+  filter: grayscale(1) brightness(.7);
+  transition: opacity var(--t-slow), filter var(--t-slow);
+}
+
+.lantern.is-lit {
+  opacity: 1;
+  filter: none;
+}
+
+.lantern__icon {
+  font-size: clamp(24px, 7vw, 32px);
+  display: block;
+  line-height: 1;
+}
+
+.lantern.is-lit .lantern__icon {
+  animation: lantern-float 2.8s ease-in-out infinite;
+}
+
+.lantern__name {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.lantern--red.is-lit    { filter: drop-shadow(0 0 10px var(--lantern-red)); }
+.lantern--blue.is-lit   { filter: drop-shadow(0 0 10px var(--lantern-blue)); }
+.lantern--purple.is-lit { filter: drop-shadow(0 0 10px var(--lantern-purple)); }
+.lantern--gold.is-lit   { filter: drop-shadow(0 0 10px var(--lantern-gold)); }
+.lantern--secret.is-lit { filter: drop-shadow(0 0 14px var(--lantern-secret)) drop-shadow(0 0 4px white); }
+
+@keyframes lantern-float {
+  0%,100% { transform: translateY(0) rotate(-4deg); }
+  50%      { transform: translateY(-5px) rotate(4deg); }
+}
+
+/* --- Section Title --- */
+.hub__section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.12em;
+  margin-bottom: var(--sp-md);
+}
+
+/* --- Game Grid --- */
+.game-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-xl);
+}
+
+.game-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--sky-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--sp-md);
+  position: relative;
+  overflow: hidden;
+  min-height: 128px;
+  transition: transform var(--t), box-shadow var(--t);
+}
+
+.game-card:active { transform: scale(0.96); }
+
+.game-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+}
+
+.game-card--red::before    { background: var(--lantern-red); }
+.game-card--blue::before   { background: var(--lantern-blue); }
+.game-card--purple::before { background: var(--lantern-purple); }
+.game-card--gold::before   { background: var(--lantern-gold); }
+
+.game-card.is-visited { border-color: rgba(255,255,255,.14); }
+
+.game-card__icon  { font-size: 26px; margin-bottom: 6px; line-height: 1; }
+.game-card__title { font-size: 12px; font-weight: 700; line-height: 1.35; margin-bottom: 4px; }
+.game-card__desc  { font-size: 10px; color: var(--text-secondary); line-height: 1.45; }
+
+.game-card__stamp {
+  position: absolute;
+  bottom: 8px; right: 8px;
+  font-size: 18px;
+  opacity: 0;
+  transition: opacity var(--t);
+}
+.game-card.is-visited .game-card__stamp { opacity: 1; }
+
+/* --- Share Section --- */
+.hub__share {
+  text-align: center;
+  margin-bottom: var(--sp-xl);
+}
+
+.btn-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  background: #06C755;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 14px 28px;
+  border-radius: var(--radius-full);
+  letter-spacing: 0.06em;
+  box-shadow: 0 4px 20px rgba(6,199,85,.35);
+  transition: transform var(--t), box-shadow var(--t);
+}
+.btn-line:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 10px rgba(6,199,85,.2);
+}
+
+.hub__share-hint {
+  margin-top: var(--sp-sm);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* --- Footer --- */
+.hub__footer {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-secondary);
+  padding-top: var(--sp-md);
+  border-top: 1px solid var(--border);
+  letter-spacing: 0.1em;
+}
+
+/* ================================================================
+   Game Pages — Shared Components
+   ================================================================ */
+
+/* ページ共通ラッパー */
+.page {
+  position: relative;
+  z-index: 1;
+  max-width: 428px;
+  margin: 0 auto;
+  padding: 0 0 var(--sp-2xl);
+}
+
+/* --- Game Header bar --- */
+.game-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px var(--sp-md);
+  background: rgba(6,8,24,.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.game-header__back  { font-size: 22px; line-height: 1; padding: 2px 6px; }
+.game-header__title { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; }
+.game-header__score { font-family: var(--font-mono); font-size: 13px; color: var(--text-accent); }
+
+/* --- HUD stats strip --- */
+.hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: var(--sp-sm) var(--sp-md);
+  background: var(--sky-mid);
+  border-bottom: 1px solid var(--border);
+  gap: var(--sp-md);
+}
+.hud__item { text-align: center; }
+.hud__label { font-size: 9px; letter-spacing: 0.1em; color: var(--text-secondary); margin-bottom: 2px; }
+.hud__value { font-family: var(--font-mono); font-size: 22px; font-weight: 900; line-height: 1; }
+.hud__value--time   { color: var(--text-primary); }
+.hud__value--combo  { color: var(--lantern-gold); }
+.hud__value--score  { color: var(--text-accent); }
+.hud__value.is-urgent { color: var(--lantern-red); animation: blink .5s step-end infinite; }
+
+@keyframes blink { 50% { opacity: .3; } }
+
+/* --- Buttons --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-sm);
+  padding: 12px var(--sp-lg);
+  border-radius: var(--radius-full);
+  font-family: var(--font-jp);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  transition: transform var(--t), box-shadow var(--t);
+}
+.btn:active { transform: scale(0.95); }
+.btn--primary {
+  background: var(--text-accent);
+  color: var(--sky-deep);
+  box-shadow: 0 4px 16px rgba(245,200,66,.4);
+}
+.btn--secondary {
+  background: var(--sky-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+/* --- Toast --- */
+.toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--sky-card);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: var(--radius-full);
+  padding: 10px 22px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 1000;
+  transition: transform 0.35s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: none;
+}
+.toast.is-visible { transform: translateX(-50%) translateY(0); }
+
+/* --- Game Complete Overlay --- */
+.game-over {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 900;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .3s ease;
+}
+.game-over.is-active { opacity: 1; pointer-events: all; }
+
+.game-over__bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  backdrop-filter: blur(6px);
+}
+
+.game-over__card {
+  position: relative;
+  background: var(--sky-card);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: var(--radius-xl);
+  padding: var(--sp-xl) var(--sp-xl);
+  width: min(88vw, 360px);
+  text-align: center;
+  animation: card-in .45s cubic-bezier(.34,1.56,.64,1);
+}
+
+@keyframes card-in {
+  0%   { transform: scale(.6) translateY(40px); opacity: 0; }
+  100% { transform: scale(1) translateY(0);     opacity: 1; }
+}
+
+.game-over__lantern   { font-size: 72px; display: block; margin-bottom: var(--sp-md); animation: lantern-float 2.5s ease-in-out infinite; }
+.game-over__headline  { font-size: 20px; font-weight: 900; color: var(--text-accent); margin-bottom: var(--sp-sm); }
+.game-over__score     { font-family: var(--font-mono); font-size: 32px; font-weight: 900; color: var(--text-accent); margin-bottom: var(--sp-lg); text-shadow: 0 0 20px rgba(245,200,66,.6); }
+.game-over__actions   { display: flex; gap: var(--sp-md); justify-content: center; flex-wrap: wrap; }
+
+/* ================================================================
+   Responsive
+   ================================================================ */
+@media (max-width: 360px) {
+  .hub__title     { font-size: 26px; }
+  .game-grid      { gap: var(--sp-sm); }
+  .game-card      { padding: var(--sp-sm); min-height: 110px; }
+  .lantern__icon  { font-size: 22px; }
+}

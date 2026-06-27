@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#060818">
+  <title>夜店ミステリー | 寺子屋すずらん</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .page { max-width: 480px; padding-bottom: 96px; }
+
+    /* ピクセルアート夜店背景 */
+    .game-bg {
+      position: fixed; inset: 0; z-index: -1;
+      background: url('assets/game3-bg.png') center top / cover no-repeat;
+    }
+    .game-bg::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(10,8,24,.62) 0%, rgba(10,8,24,.5) 45%, rgba(10,8,24,.82) 100%);
+    }
+    .game-header { background: rgba(10,8,24,.72); backdrop-filter: blur(6px); }
+
+    /* --- 事件カード --- */
+    .case-card {
+      background: linear-gradient(160deg, #2a1e3a, #1a1430);
+      border: 1px solid rgba(155,89,182,.4);
+      border-radius: var(--radius-lg);
+      padding: var(--sp-lg);
+      margin: var(--sp-md);
+      box-shadow: 0 6px 24px rgba(0,0,0,.4);
+    }
+    .case-card__label {
+      font-size: 10px; letter-spacing: .18em;
+      color: var(--lantern-purple); font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .case-card__title {
+      font-size: 19px; font-weight: 900; line-height: 1.4;
+      margin-bottom: var(--sp-md);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .case-card__intro {
+      font-size: 13.5px; line-height: 1.9; color: #d8cce8;
+    }
+
+    /* --- セクション見出し --- */
+    .section-h {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 800; letter-spacing: .08em;
+      color: var(--text-primary);
+      margin: var(--sp-lg) var(--sp-md) var(--sp-sm);
+    }
+    .section-h__sub { font-size: 10px; color: var(--text-secondary); font-weight: 400; }
+
+    /* --- 容疑者カード --- */
+    .suspects { padding: 0 var(--sp-md); display: flex; flex-direction: column; gap: 10px; }
+    .suspect {
+      background: var(--sky-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      display: flex; gap: 12px; align-items: flex-start;
+      transition: border-color .2s, box-shadow .2s, transform .12s;
+    }
+    .suspect.is-accused {
+      border-color: var(--lantern-purple);
+      box-shadow: 0 0 0 2px rgba(155,89,182,.35);
+    }
+    .suspect.is-shake { animation: shake .4s; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-7px)} 50%{transform:translateX(7px)} 75%{transform:translateX(-4px)} }
+    .suspect__avatar { font-size: 38px; line-height: 1; flex-shrink: 0; }
+    .suspect__body { flex: 1; min-width: 0; }
+    .suspect__name { font-size: 14px; font-weight: 800; margin-bottom: 4px; }
+    .suspect__say  {
+      font-size: 12.5px; line-height: 1.65; color: #c8c0d8;
+      position: relative; padding-left: 14px;
+    }
+    .suspect__say::before { content: '「'; position: absolute; left: 0; color: var(--lantern-purple); }
+    .suspect__say::after  { content: '」'; color: var(--lantern-purple); }
+    .suspect__accuse {
+      margin-top: 10px;
+      width: 100%;
+      background: rgba(155,89,182,.16);
+      border: 1px solid rgba(155,89,182,.45);
+      color: #e0c8f0;
+      font-size: 12px; font-weight: 700;
+      padding: 9px; border-radius: var(--radius-sm);
+      transition: background .15s, transform .1s;
+    }
+    .suspect__accuse:active { transform: scale(.96); background: rgba(155,89,182,.3); }
+
+    /* --- 手がかりカード --- */
+    .clues { padding: 0 var(--sp-md); display: flex; flex-direction: column; gap: 10px; }
+    .clue {
+      background: var(--sky-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+    .clue.is-open { border-color: rgba(245,200,66,.4); }
+    .clue__head {
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 14px;
+      width: 100%;
+      text-align: left;
+      transition: background .15s;
+    }
+    .clue__head:active { background: var(--sky-hover); }
+    .clue__icon  {
+      font-size: 26px; line-height: 1; flex-shrink: 0;
+      width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--sky-surface); border-radius: 10px;
+    }
+    .clue__label { flex: 1; font-size: 13px; font-weight: 700; }
+    .clue__toggle { font-size: 12px; color: var(--text-secondary); }
+    .clue.is-open .clue__toggle { color: var(--text-accent); }
+    .clue__detail {
+      max-height: 0; overflow: hidden;
+      transition: max-height .35s ease, padding .35s ease;
+      padding: 0 14px;
+      font-size: 12.5px; line-height: 1.8; color: #d0d8e8;
+      border-top: 0 solid var(--border);
+    }
+    .clue.is-open .clue__detail {
+      max-height: 220px;
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* --- ヒント --- */
+    .hint-wrap { padding: var(--sp-md) var(--sp-md) 0; }
+    .btn-hint {
+      width: 100%;
+      background: var(--sky-surface);
+      border: 1px dashed rgba(255,255,255,.2);
+      color: var(--text-secondary);
+      font-size: 12px; font-weight: 700;
+      padding: 11px; border-radius: var(--radius-sm);
+    }
+    .hint-text {
+      margin-top: 10px;
+      background: rgba(245,200,66,.08);
+      border: 1px solid rgba(245,200,66,.25);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 12.5px; line-height: 1.8; color: #e8d9a8;
+      display: none;
+    }
+    .hint-text.is-shown { display: block; }
+
+    /* --- 進捗フッター --- */
+    .myst-footer {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 480px;
+      background: rgba(6,8,24,.92);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid var(--border);
+      padding: 10px var(--sp-md);
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 12px; color: var(--text-secondary);
+      z-index: 100;
+    }
+    .myst-footer strong { color: var(--text-accent); font-family: var(--font-mono); }
+
+    /* --- 推理結果モーダル --- */
+    .verdict__solution {
+      text-align: left;
+      background: rgba(155,89,182,.12);
+      border: 1px solid rgba(155,89,182,.3);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-size: 13px; line-height: 1.85; color: #e0d4ec;
+      margin-bottom: var(--sp-lg);
+    }
+
+    /* スタート画面 */
+    .start-screen {
+      position: fixed; inset: 0; z-index: 950;
+      background: rgba(6,8,24,.94);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: var(--sp-xl); gap: var(--sp-md);
+    }
+    .start-screen__icon  { font-size: 60px; }
+    .start-screen__title { font-size: 22px; font-weight: 900; color: var(--lantern-purple); text-shadow: 0 0 20px rgba(155,89,182,.5); }
+    .start-screen__rule  { font-size: 13px; color: var(--text-secondary); line-height: 1.9; }
+  </style>
+</head>
+<body>
+
+<div class="game-bg" aria-hidden="true"></div>
+<div id="stars" aria-hidden="true"></div>
+
+<main class="page">
+  <h1 class="sr-only">夜店ミステリー — 証言と手がかりを照合して事件を解く推理ゲーム</h1>
+
+  <header class="game-header">
+    <a class="game-header__back" href="../index.html" aria-label="ハブに戻る">‹</a>
+    <span class="game-header__title">🔍 夜店ミステリー</span>
+    <span class="game-header__score" id="score">🔍</span>
+  </header>
+
+  <div id="game-body"><!-- loadCase で構築 --></div>
+</main>
+
+<!-- 進捗フッター -->
+<div class="myst-footer" id="footer" style="display:none">
+  <span>調べた手がかり <strong id="clue-count">0</strong> / <strong id="clue-total">3</strong></span>
+  <span>あやしい人をタップで推理👆</span>
+</div>
+
+<!-- スタート画面 -->
+<div class="start-screen" id="start-screen">
+  <div class="start-screen__icon">🔍</div>
+  <div class="start-screen__title">夜店ミステリー</div>
+  <p class="start-screen__rule">
+    夜市でおきた小さな事件…🏮<br>
+    <strong style="color:var(--text-accent)">手がかり</strong>を調べて、<br>
+    みんなの<strong style="color:var(--text-accent)">証言</strong>とくらべよう。<br>
+    ひとりだけ、ウソをついてるよ👀<br><br>
+    真相を見ぬくと<br>
+    💜 紫ちょうちん ゲット！
+  </p>
+  <button class="btn btn--primary" id="start-btn">事件ファイルを開く</button>
+</div>
+
+<script src="../common.js"></script>
+<script>
+'use strict';
+
+// ================================================================
+// 事件データ
+//   各ケースは「容疑者の証言」と「手がかり」で構成。
+//   手がかりと照らすと、ひとりの証言だけが矛盾する＝犯人。
+//   culprit: 容疑者配列のインデックス
+// ================================================================
+const CASES = [
+  {
+    icon: '🐟',
+    title: '消えた出目金',
+    intro: '金魚すくいの水そうから、いちばん大きな出目金が一ぴき消えてしまった。' +
+           '袋に入れて持ち帰った子がいるみたい。あやしい三人のうち、' +
+           '本当のことを言っていないのはだれ？',
+    suspects: [
+      { avatar:'👧', name:'ハナ',   say:'わたしはずっと、かき氷を食べてたの。金魚なんてすくってないわ。' },
+      { avatar:'👦', name:'ケンタ', say:'金魚すくいはやったけど、一ぴきも取れなかったよ。すぐあきらめたんだ。' },
+      { avatar:'🧒', name:'ソウタ', say:'ぼくはずっと射的の屋台にいたよ。金魚すくいには近づいてないって。' },
+    ],
+    clues: [
+      { icon:'🍧', label:'かき氷屋さんの話', detail:'「ハナちゃんなら、さっきまでずっとここで食べてたよ。シロップのおかわりもしてったね。」' },
+      { icon:'🎯', label:'射的屋さんの話',   detail:'「今夜、射的に来た子はまだ一人もいないよ。ソウタくん？　見かけてないなあ。」' },
+      { icon:'🗑️', label:'ゴミ箱の中',       detail:'水でぬれた金魚の袋が、すてられていた。中をよく見ると、出目金のものらしい大きなウロコが一枚、はりついている。' },
+    ],
+    culprit: 2,
+    solution: 'ソウタは「ずっと射的にいた」と言ったけれど、射的屋さんは「今夜だれも来ていない」と証言。' +
+              'アリバイがウソだったのはソウタだけ。ゴミ箱の濡れた袋にはウロコ——出目金を袋で持ち出した動かぬ証拠。犯人はソウタ！',
+    hint: 'まずは三人のアリバイを、屋台の人の証言とくらべてみよう。ウラが取れない人は一人だけ。',
+  },
+  {
+    icon: '🍎',
+    title: '最後のりんご飴',
+    intro: '屋台に一本だけ残っていた、特製の大きなりんご飴。' +
+           '目をはなしたすきに、だれかが食べてしまったみたい。' +
+           '赤い飴は、食べると口のまわりに色がつくらしい…。',
+    suspects: [
+      { avatar:'👩', name:'ユイ',   say:'わたしは盆踊りの輪の中で、ずっと踊ってたの。屋台には行ってないわ。' },
+      { avatar:'🧑', name:'タケシ', say:'ぼくはラムネを飲んでただけ。あまいものは苦手なんだ。' },
+      { avatar:'👧', name:'みさき', say:'わたしは金魚すくいをしてたの。りんご飴なんて見てもいないわ。' },
+    ],
+    clues: [
+      { icon:'🎐', label:'盆踊りの人の話',   detail:'「ユイちゃんなら、一曲目から最後までずっと踊ってたわよ。いい踊りっぷりだったわ。」' },
+      { icon:'🥤', label:'ラムネ屋さんの話', detail:'「タケシくんはラムネを二本買って、ずっとそこのベンチで飲んでたよ。」' },
+      { icon:'🐟', label:'金魚すくい屋の話', detail:'「みさきちゃん？　来たのは来たけど、すぐにどこかへ行っちゃったよ。口のまわりが赤かったのが気になったなあ。」' },
+    ],
+    culprit: 2,
+    solution: 'ユイとタケシのアリバイは、それぞれ屋台の人がしっかり証言してくれた。' +
+              'でもみさきは「ずっと金魚すくいにいた」と言ったのに、お店の人は「すぐいなくなった」と証言。' +
+              'しかも口のまわりが赤い——りんご飴の色！　食べたのはみさきだ。',
+    hint: '三人とも「ちがう場所にいた」と言っている。その場所の人が、本当にそう言ってくれるか確かめよう。',
+  },
+  {
+    icon: '🏮',
+    title: '迷子のちょうちん',
+    intro: 'ベンチに、うさぎ柄のかわいいちょうちんが置き忘れられていた。' +
+           '三人が「わたしのです」と名乗り出たけれど、本当の持ち主は一人だけ。' +
+           'ちょうちんをよく調べて、持ち主を見つけてあげよう。',
+    suspects: [
+      { avatar:'👧', name:'リン',   say:'それ、わたしの！　ピンクのうさぎ柄でしょ、すぐわかるもん。' },
+      { avatar:'👦', name:'ダイキ', say:'ぼくのだよ。中に本物のろうそくじゃなくて、電池の明かりが入ってるんだ。' },
+      { avatar:'👧', name:'さくら', say:'わたしのです。持ち手のところに、名前のシールをはってあるの。' },
+    ],
+    clues: [
+      { icon:'🐰', label:'ちょうちんの柄', detail:'よく見ると、えがかれているのは青いうさぎ。ピンクではない。' },
+      { icon:'🕯️', label:'ちょうちんの中身', detail:'中をのぞくと、小さな本物のろうそくがゆれている。電池の明かりではない。' },
+      { icon:'🏷️', label:'持ち手のシール', detail:'持ち手の根もとに、ていねいな字で「さくら」と書かれた手作りシールがはってある。' },
+    ],
+    culprit: 2,
+    solution: 'リンは「ピンクのうさぎ」と言ったが、柄は青いうさぎ。ダイキは「電池の明かり」と言ったが、中身は本物のろうそく。' +
+              '二人の言い分は、ちょうちんの特ちょうと食いちがう。「さくら」のシールどおり、本当の持ち主はさくらだった。',
+    hint: 'それぞれが言う「特ちょう」を、実際のちょうちんと一つずつ見くらべてみよう。合っているのは一人だけ。',
+  },
+];
+
+// ================================================================
+// 状態
+// ================================================================
+let curCase = null;
+let cluesOpened = new Set();
+let wrongCount = 0;
+let hintUsed = false;
+let solved = false;
+let lastCaseIdx = -1;
+
+// ================================================================
+// DOM
+// ================================================================
+const body      = document.getElementById('game-body');
+const footer    = document.getElementById('footer');
+const clueCount = document.getElementById('clue-count');
+const clueTotal = document.getElementById('clue-total');
+
+// ================================================================
+// ケース読み込み
+// ================================================================
+function pickCase() {
+  if (CASES.length === 1) return 0;
+  let i;
+  do { i = Math.floor(Math.random() * CASES.length); } while (i === lastCaseIdx);
+  lastCaseIdx = i;
+  return i;
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function loadCase() {
+  curCase = CASES[pickCase()];
+  // 犯人が常に同じ位置に並ばないよう、容疑者の表示順をシャッフル
+  // （犯人は isCulprit フラグで追跡）
+  curCase._suspects = shuffle(
+    curCase.suspects.map((s, i) => ({ ...s, isCulprit: i === curCase.culprit }))
+  );
+  cluesOpened = new Set();
+  wrongCount = 0; hintUsed = false; solved = false;
+
+  body.innerHTML = `
+    <div class="case-card">
+      <div class="case-card__label">📁 じけんファイル</div>
+      <div class="case-card__title"><span>${curCase.icon}</span>${curCase.title}</div>
+      <p class="case-card__intro">${curCase.intro}</p>
+    </div>
+
+    <div class="section-h">👥 容疑者 <span class="section-h__sub">あやしいと思った人をタップ</span></div>
+    <div class="suspects" id="suspects"></div>
+
+    <div class="section-h">🔎 手がかり <span class="section-h__sub">タップで調べる</span></div>
+    <div class="clues" id="clues"></div>
+
+    <div class="hint-wrap">
+      <button class="btn-hint" id="btn-hint">💡 ヒントを見る（スコア -80）</button>
+      <p class="hint-text" id="hint-text">${curCase.hint}</p>
+    </div>
+  `;
+
+  // 容疑者（シャッフル済みの _suspects から描画）
+  const sus = document.getElementById('suspects');
+  curCase._suspects.forEach((s) => {
+    const el = document.createElement('div');
+    el.className = 'suspect';
+    el.innerHTML = `
+      <span class="suspect__avatar">${s.avatar}</span>
+      <div class="suspect__body">
+        <div class="suspect__name">${s.name}</div>
+        <div class="suspect__say">${s.say}</div>
+        <button class="suspect__accuse">🔍 ${s.name}があやしい！</button>
+      </div>`;
+    el.querySelector('.suspect__accuse').addEventListener('click', () => accuse(s, el));
+    sus.appendChild(el);
+  });
+
+  // 手がかり
+  const cls = document.getElementById('clues');
+  curCase.clues.forEach((c, i) => {
+    const el = document.createElement('div');
+    el.className = 'clue';
+    el.innerHTML = `
+      <button class="clue__head" aria-expanded="false">
+        <span class="clue__icon">${c.icon}</span>
+        <span class="clue__label">${c.label}</span>
+        <span class="clue__toggle">調べる ▾</span>
+      </button>
+      <div class="clue__detail">${c.detail}</div>`;
+    el.querySelector('.clue__head').addEventListener('click', () => toggleClue(i, el));
+    cls.appendChild(el);
+  });
+
+  // ヒント
+  document.getElementById('btn-hint').addEventListener('click', useHint);
+
+  clueTotal.textContent = curCase.clues.length;
+  clueCount.textContent = '0';
+  footer.style.display = 'flex';
+  window.scrollTo(0, 0);
+}
+
+// ================================================================
+// 操作
+// ================================================================
+function toggleClue(i, el) {
+  const open = el.classList.toggle('is-open');
+  el.querySelector('.clue__head').setAttribute('aria-expanded', open);
+  el.querySelector('.clue__toggle').textContent = open ? '閉じる ▴' : '調べる ▾';
+  if (open) {
+    cluesOpened.add(i);
+    clueCount.textContent = cluesOpened.size;
+  }
+}
+
+function useHint() {
+  hintUsed = true;
+  document.getElementById('hint-text').classList.add('is-shown');
+  document.getElementById('btn-hint').style.display = 'none';
+}
+
+function accuse(suspect, el) {
+  if (solved) return;
+
+  if (suspect.isCulprit) {
+    solved = true;
+    el.classList.add('is-accused');
+    const score = Math.max(100, 500 - wrongCount * 100 - (hintUsed ? 80 : 0));
+    setTimeout(() => showVerdict(true, score), 350);
+  } else {
+    wrongCount++;
+    el.classList.remove('is-shake'); void el.offsetWidth; el.classList.add('is-shake');
+    showWrongVerdict(suspect.name);
+  }
+}
+
+// ================================================================
+// 判定演出
+// ================================================================
+function showWrongVerdict(name) {
+  showToast(`${name}じゃないみたい…もう一度考えよう🤔`);
+  // ヒントをそっと開放（2回まちがえたら）
+  if (wrongCount >= 2 && !hintUsed) {
+    useHint();
+    setTimeout(() => showToast('💡 ヒントを開いたよ'), 1400);
+  }
+}
+
+function showVerdict(correct, score) {
+  const ov = document.createElement('div');
+  ov.className = 'game-over';
+  ov.innerHTML = `
+    <div class="game-over__bg"></div>
+    <div class="game-over__card">
+      <span class="game-over__lantern">💜</span>
+      <p class="game-over__headline">事件かいけつ！</p>
+      <div class="verdict__solution">🔍 ${curCase.solution}</div>
+      <p class="game-over__score">${score}<small style="font-size:.5em;margin-left:4px">名探偵スコア</small></p>
+      <div class="game-over__actions">
+        <button class="btn btn--primary"   id="v-hub">💜 紫ちょうちんGET</button>
+        <button class="btn btn--secondary" id="v-next">別の事件に挑戦</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => ov.classList.add('is-active'));
+
+  // 紫ちょうちんを保存（ハブで点灯）
+  setLantern(3);
+
+  ov.querySelector('#v-hub').addEventListener('click', () => { location.href = getHubUrl(); });
+  ov.querySelector('#v-next').addEventListener('click', () => {
+    ov.classList.remove('is-active');
+    setTimeout(() => { ov.remove(); loadCase(); }, 320);
+  });
+}
+
+// ================================================================
+// 起動
+// ================================================================
+initStars(document.getElementById('stars'));
+document.getElementById('start-btn').addEventListener('click', () => {
+  document.getElementById('start-screen').style.display = 'none';
+  loadCase();
+});
+</script>
+
+</body>
+</html>

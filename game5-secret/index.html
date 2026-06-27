@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1a3a1a">
+  <title>公園の宝物探し | 寺子屋すずらん</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    body { overflow: hidden; height: 100vh; height: 100dvh; background: #0d2010; }
+
+    .page {
+      height: 100vh; height: 100dvh;
+      display: flex; flex-direction: column;
+      align-items: center;
+      padding: 0;
+      max-width: 480px;
+    }
+
+    /* ---- マップキャンバス ---- */
+    .map-wrap {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      min-height: 0;
+    }
+    #map-canvas {
+      display: block;
+      touch-action: none;
+      cursor: crosshair;
+      border-radius: 12px;
+      box-shadow: 0 0 32px rgba(0,200,80,.18);
+    }
+
+    /* ---- ヒントパネル ---- */
+    .clue-panel {
+      width: 100%;
+      background: rgba(10,30,10,.9);
+      border-top: 1px solid rgba(80,180,80,.25);
+      padding: 10px 16px;
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
+      min-height: 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .clue-panel__label {
+      font-size: 9px;
+      letter-spacing: .1em;
+      color: rgba(120,220,120,.7);
+    }
+    .clue-panel__text {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      min-height: 2.4em;
+    }
+    .clue-panel__taps {
+      font-size: 10px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tap-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: rgba(120,220,120,.3);
+      border: 1px solid rgba(80,180,80,.5);
+      display: inline-block;
+      transition: background .3s;
+    }
+    .tap-dot.used { background: rgba(200,80,80,.7); border-color: rgba(220,80,80,.8); }
+
+    /* ---- 温度フィードバック ---- */
+    .temp-badge {
+      position: absolute;
+      font-size: 22px; font-weight: 900;
+      pointer-events: none;
+      z-index: 20;
+      text-shadow: 0 2px 8px rgba(0,0,0,.8);
+      animation: temp-rise .9s ease-out forwards;
+    }
+    @keyframes temp-rise {
+      0%  { opacity:0; transform:translateY(0) scale(.5); }
+      20% { opacity:1; }
+      100%{ opacity:0; transform:translateY(-60px) scale(1.1); }
+    }
+
+    /* ---- スタート画面 ---- */
+    .start-screen {
+      position: fixed; inset: 0; z-index: 950;
+      background: rgba(8,20,8,.93);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 32px 24px;
+      gap: 12px;
+    }
+    .start-screen__icon { font-size: 64px; }
+    .start-screen__title { font-size: 22px; font-weight: 900; color: #7de87d; }
+    .start-screen__rule  { font-size: 13px; color: var(--text-secondary); line-height: 1.9; }
+  </style>
+</head>
+<body>
+
+<div id="stars" aria-hidden="true"></div>
+
+<main class="page">
+  <header class="game-header" style="width:100%;background:rgba(8,20,8,.8);backdrop-filter:blur(6px);">
+    <a class="game-header__back" href="../index.html" aria-label="ハブに戻る">‹</a>
+    <span class="game-header__title">🗺️ 公園の宝物探し</span>
+    <span class="game-header__score" id="score">0</span>
+  </header>
+
+  <div class="map-wrap" id="map-wrap">
+    <canvas id="map-canvas"></canvas>
+  </div>
+
+  <div class="clue-panel">
+    <span class="clue-panel__label">🔍 ヒント</span>
+    <div class="clue-panel__text" id="clue-text">マップをタップして宝物を探そう！</div>
+    <div class="clue-panel__taps">
+      <span id="tap-dots"></span>
+      <span id="tap-label" style="margin-left:6px">残り <strong id="taps-left">8</strong> 回</span>
+    </div>
+  </div>
+</main>
+
+<!-- スタート画面 -->
+<div class="start-screen" id="start-screen">
+  <div class="start-screen__icon">🗺️</div>
+  <div class="start-screen__title">公園の宝物探し</div>
+  <p class="start-screen__rule">
+    公園のどこかに<strong style="color:#7de87d">宝物</strong>が隠されているよ！<br>
+    マップをタップして場所を当てよう🔍<br><br>
+    🔥 近い　🌡️ まあまあ　❄️ 遠い<br><br>
+    ヒントを手がかりに <strong style="color:#7de87d">8回以内</strong> で見つけよう！
+  </p>
+  <button class="btn btn--primary" id="start-btn" style="background:#2a8a2a;border-color:#3ab03a;">スタート！</button>
+</div>
+
+<script src="../common.js"></script>
+<script>
+'use strict';
+
+// ============================================================
+// 定数
+// ============================================================
+const MAX_TAPS = 8;
+
+// 宝物の相対座標（マップ上 0〜1）
+const TREASURE = { rx: 0.62, ry: 0.68 };
+
+// ヒント（タップ回数に応じて段階的に開示）
+const CLUES = [
+  { after: 0, text: 'マップをタップして宝物を探そう！' },
+  { after: 2, text: '🌿 宝物は公園の中心より少し外れた場所にあるよ…' },
+  { after: 4, text: '🎠 遊具のそばを探してみよう！' },
+  { after: 6, text: '🌸 花壇のそば、ブランコの近くをよく見て！' },
+];
+
+// 温度フィードバック（距離 0〜1）
+const TEMP = [
+  { max: 0.12, label: '🎉 みつけた！', color: '#ffe040', icon: '💥' },
+  { max: 0.22, label: '🔥 あつい！',   color: '#ff6020', icon: '🔥' },
+  { max: 0.38, label: '🌡️ あたたかい', color: '#ff9040', icon: '🌡️' },
+  { max: 0.55, label: '❄️ つめたい',   color: '#40c0ff', icon: '❄️' },
+  { max: 1.00, label: '🧊 こおりそう！',color: '#80d8ff', icon: '🧊' },
+];
+
+// ============================================================
+// 状態
+// ============================================================
+let tapsLeft = MAX_TAPS;
+let tapsUsed = 0;
+let found    = false;
+let gameActive = false;
+const markers = [];
+
+// ============================================================
+// Canvas セットアップ
+// ============================================================
+const canvas = document.getElementById('map-canvas');
+const ctx    = canvas.getContext('2d');
+const wrap   = document.getElementById('map-wrap');
+const mapImg = new Image();
+mapImg.src   = 'assets/park-map.png';
+
+let canvasSize = 300;
+
+function resize() {
+  const w = wrap.clientWidth  - 16;
+  const h = wrap.clientHeight - 16;
+  canvasSize = Math.min(w, h, 400);
+  canvas.width  = canvasSize;
+  canvas.height = canvasSize;
+  canvas.style.width  = canvasSize + 'px';
+  canvas.style.height = canvasSize + 'px';
+  draw();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+  // 地図
+  if (mapImg.complete && mapImg.naturalWidth > 0) {
+    ctx.drawImage(mapImg, 0, 0, canvasSize, canvasSize);
+    ctx.fillStyle = 'rgba(0,0,0,.15)';
+    ctx.fillRect(0, 0, canvasSize, canvasSize);
+  } else {
+    ctx.fillStyle = '#1a4a20';
+    ctx.fillRect(0, 0, canvasSize, canvasSize);
+    ctx.fillStyle = 'rgba(255,255,255,.3)';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('マップ読み込み中…', canvasSize / 2, canvasSize / 2);
+  }
+
+  // タップマーカー
+  markers.forEach(m => {
+    const x = m.rx * canvasSize;
+    const y = m.ry * canvasSize;
+    ctx.beginPath();
+    ctx.arc(x, y, 14, 0, Math.PI * 2);
+    ctx.fillStyle = m.color + '55';
+    ctx.fill();
+    ctx.strokeStyle = m.color;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.font = '13px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(m.icon, x, y);
+  });
+
+  // 宝物（発見時）
+  if (found) {
+    const tx = TREASURE.rx * canvasSize;
+    const ty = TREASURE.ry * canvasSize;
+    ctx.font = '32px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('💎', tx, ty);
+    ctx.beginPath();
+    ctx.arc(tx, ty, 24, 0, Math.PI * 2);
+    ctx.strokeStyle = '#ffe040';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([5, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+mapImg.onload = () => resize();
+window.addEventListener('resize', resize);
+
+// ============================================================
+// タップ処理
+// ============================================================
+function getRelPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const src  = e.touches ? e.touches[0] : e;
+  return {
+    rx: (src.clientX - rect.left) / canvasSize,
+    ry: (src.clientY - rect.top)  / canvasSize,
+  };
+}
+
+function distTo(rx, ry) {
+  return Math.hypot(rx - TREASURE.rx, ry - TREASURE.ry);
+}
+
+function onTap(e) {
+  e.preventDefault();
+  if (!gameActive || found || tapsLeft <= 0) return;
+
+  const { rx, ry } = getRelPos(e);
+  const d  = distTo(rx, ry);
+  const ti = TEMP.find(t => d <= t.max);
+
+  tapsUsed++;
+  tapsLeft--;
+  markers.push({ rx, ry, color: ti.color, icon: ti.icon });
+
+  // フィードバックバッジ
+  const bx = rx * canvasSize;
+  const by = ry * canvasSize - 20;
+  showTempBadge(bx, by, ti.label, ti.color);
+
+  updateClue();
+  updateTapDots();
+  draw();
+
+  if (d <= TEMP[0].max) {
+    found = true;
+    draw();
+    gameActive = false;
+    setTimeout(() => {
+      const score = Math.max(100, 500 - (tapsUsed - 1) * 55);
+      document.getElementById('score').textContent = score;
+      showGameComplete({ lanternId: 5, score })
+        .then(r => { if (r === 'retry') startGame(); });
+    }, 1200);
+  } else if (tapsLeft <= 0) {
+    gameActive = false;
+    setTimeout(showFail, 800);
+  }
+}
+
+canvas.addEventListener('click',      onTap);
+canvas.addEventListener('touchstart', onTap, { passive: false });
+
+// ============================================================
+// UI 更新
+// ============================================================
+function updateClue() {
+  const active = [...CLUES].reverse().find(c => tapsUsed >= c.after);
+  if (active) document.getElementById('clue-text').textContent = active.text;
+}
+
+function updateTapDots() {
+  const dots = document.getElementById('tap-dots');
+  dots.innerHTML = '';
+  for (let i = 0; i < MAX_TAPS; i++) {
+    const d = document.createElement('span');
+    d.className = 'tap-dot' + (i < tapsUsed ? ' used' : '');
+    dots.appendChild(d);
+  }
+  document.getElementById('taps-left').textContent = tapsLeft;
+}
+
+function showTempBadge(x, y, label, color) {
+  const wrapRect   = wrap.getBoundingClientRect();
+  const canvasRect = canvas.getBoundingClientRect();
+  const badge = document.createElement('div');
+  badge.className   = 'temp-badge';
+  badge.textContent = label;
+  badge.style.color = color;
+  badge.style.left  = (canvasRect.left - wrapRect.left + x - 40) + 'px';
+  badge.style.top   = (canvasRect.top  - wrapRect.top  + y)      + 'px';
+  wrap.appendChild(badge);
+  setTimeout(() => badge.remove(), 920);
+}
+
+// ============================================================
+// 失敗オーバーレイ
+// ============================================================
+function showFail() {
+  const tx = Math.round(TREASURE.rx * 100);
+  const ty = Math.round(TREASURE.ry * 100);
+  const overlay = document.createElement('div');
+  overlay.className = 'game-over';
+  overlay.innerHTML = `
+    <div class="game-over__bg"></div>
+    <div class="game-over__card">
+      <span class="game-over__lantern" style="filter:grayscale(1);opacity:.6">💎</span>
+      <p class="game-over__headline" style="color:var(--text-primary)">見つからなかった…</p>
+      <p style="color:var(--text-secondary);font-size:13px;margin-bottom:8px">
+        宝物はマップの右下エリアにあったよ！
+      </p>
+      <p style="color:var(--text-secondary);font-size:12px;margin-bottom:20px">
+        ヒントを使って次は見つけよう🔍
+      </p>
+      <div class="game-over__actions">
+        <button class="btn btn--primary" id="fail-retry" style="background:#2a8a2a">もう一度</button>
+        <button class="btn btn--secondary" id="fail-hub">ハブに戻る</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('is-active'));
+  overlay.querySelector('#fail-retry').addEventListener('click', () => { overlay.remove(); startGame(); });
+  overlay.querySelector('#fail-hub').addEventListener('click',   () => { location.href = getHubUrl(); });
+}
+
+// ============================================================
+// 初期化
+// ============================================================
+initStars(document.getElementById('stars'));
+updateTapDots();
+resize();
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+</script>
+</body>
+</html>

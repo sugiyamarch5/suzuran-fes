@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>QRコード印刷シート — 寺子屋すずらん</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Hiragino Sans', 'Yu Gothic', sans-serif; background: #f5f0e8; color: #111; padding: 24px; }
+
+    .page-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .page-header h1 { font-size: 20px; margin-bottom: 6px; }
+    .page-header p  { font-size: 11px; color: #666; line-height: 1.7; }
+
+    .no-print {
+      text-align: center;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    .no-print button {
+      padding: 8px 24px;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      background: #fff;
+    }
+    .no-print button.primary {
+      background: #222;
+      color: #fff;
+      border-color: #222;
+    }
+
+    /* === カードグリッド === */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: #fff;
+      border: 3px solid #ccc;
+      border-radius: 16px;
+      padding: 16px 12px 14px;
+      text-align: center;
+      page-break-inside: avoid;
+      position: relative;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    /* ゲームごとのアクセントカラー */
+    .card--1 { border-color: #c0392b; }
+    .card--2 { border-color: #2980b9; }
+    .card--3 { border-color: #7d3c98; }
+    .card--4 { border-color: #d4a000; }
+    .card--5 { border-color: #f5c842; background: #fffbea; }
+
+    .card__capsule {
+      font-size: 28px;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .card__game-icon {
+      font-size: 14px;
+      margin-bottom: 3px;
+    }
+
+    .card__label {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .card__game {
+      font-size: 10px;
+      color: #666;
+      margin-bottom: 10px;
+    }
+
+    .card__qr img {
+      width: 150px;
+      height: 150px;
+      display: block;
+      margin: 0 auto;
+      border: 1px solid #eee;
+      border-radius: 8px;
+    }
+
+    .card__url {
+      font-size: 8px;
+      color: #aaa;
+      margin-top: 8px;
+      word-break: break-all;
+      line-height: 1.4;
+    }
+
+    .card__badge {
+      display: inline-block;
+      font-size: 10px;
+      background: #f5c842;
+      color: #5a3a00;
+      border-radius: 999px;
+      padding: 2px 10px;
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    /* カットライン注釈 */
+    .cut-hint {
+      max-width: 720px;
+      margin: 18px auto 0;
+      font-size: 10px;
+      color: #999;
+      text-align: center;
+    }
+
+    /* ===== 印刷時 ===== */
+    @media print {
+      body { background: #fff; padding: 6px; }
+      .no-print { display: none; }
+      .grid { gap: 12px; }
+      .card { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>🏮 寺子屋すずらん ガチャQRシート</h1>
+  <p>
+    各カードを切り取ってガチャカプセルに封入してください<br>
+    通常カプセル（赤・青・紫・黄）×複数枚 ＋ レアカプセル（金）×少数
+  </p>
+</div>
+
+<div class="no-print">
+  <button onclick="window.print()" class="primary">🖨 印刷する</button>
+  <button onclick="window.location.href='index.html'">← トップに戻る</button>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<p class="cut-hint">✂ カードのまわりの点線に沿って切り取り、カプセルに入れてください</p>
+
+<script>
+const BASE = 'https://sugiyamarch5.github.io/suzuran-fes/';
+
+const GAMES = [
+  { id: 1, capsule: '🔴', icon: '🍧', name: '屋台スピードパズル', path: 'game1-yatai/', rare: false },
+  { id: 2, capsule: '🔵', icon: '🎮', name: 'ネオンクレーン',     path: 'game2-crane/', rare: false },
+  { id: 3, capsule: '🟣', icon: '🔍', name: '夜店ミステリー',     path: 'game3-mystery/', rare: false },
+  { id: 4, capsule: '🟡', icon: '🌿', name: '灯りの迷路',         path: 'game4-maze/', rare: false },
+  { id: 5, capsule: '🟡', icon: '🗺️', name: '公園の宝物探し',    path: 'game5-secret/', rare: true },
+];
+
+const grid = document.getElementById('grid');
+
+GAMES.forEach(g => {
+  const url    = BASE + g.path;
+  const qrSrc  = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=150x150&margin=6&color=111111&bgcolor=ffffff`;
+  const card   = document.createElement('div');
+  card.className = `card card--${g.id}`;
+  card.innerHTML = `
+    ${g.rare ? '<span class="card__badge">✨ RARE</span>' : ''}
+    <div class="card__capsule">${g.capsule}</div>
+    <div class="card__label">${g.icon} ${g.name}</div>
+    <div class="card__game">カプセルの色：${g.capsule}</div>
+    <div class="card__qr"><img src="${qrSrc}" alt="QR: ${g.name}" loading="lazy"></div>
+    <div class="card__url">${url}</div>
+  `;
+  grid.appendChild(card);
+});
+</script>
+</body>
+</html>
