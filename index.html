@@ -325,6 +325,16 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    /* レア当選カードはきらめく金枠 */
+    .gacha-result__card--rare {
+      animation: slideUp 0.4s ease-out 0.35s both, rareGlow 1.6s ease-in-out 0.75s infinite;
+    }
+
+    @keyframes rareGlow {
+      0%, 100% { box-shadow: 0 0 24px rgba(245,200,66,0.45); }
+      50%      { box-shadow: 0 0 40px rgba(245,200,66,0.85); }
+    }
+
     .gacha-result__game-icon {
       font-size: 54px;
       margin-bottom: 10px;
@@ -405,9 +415,7 @@
 
   <!-- ヘッダー -->
   <header class="hub__header">
-    <p class="hub__tagline">こわがらず、うのみにせず。</p>
     <h1 class="hub__title">寺子屋すずらん</h1>
-    <p class="hub__subtitle">AIの聞き方・調べ方・考え方</p>
     <span class="hub__badge">🏮 夜市ゲーム</span>
   </header>
 
@@ -490,7 +498,7 @@
 
     <!-- 結果パネル（初期非表示） -->
     <div class="gacha-result" id="gachaResult" hidden>
-      <p class="gacha-result__label">✨ カプセルが出てきたよ！</p>
+      <p class="gacha-result__label" id="resultLabel">✨ カプセルが出てきたよ！</p>
       <div class="gacha-result__capsule" id="resultCapsule">🔴</div>
       <div class="gacha-result__card" id="resultCard">
         <div class="gacha-result__game-icon" id="resultIcon">🍧</div>
@@ -563,6 +571,20 @@
     },
   ];
 
+  // レアゲーム（低確率で出現）
+  const RARE_GAME = {
+    id: 5, capsule: '🌟', icon: '🗺️',
+    name: '公園の宝物探し',
+    desc: '隠された秘宝を見つけ出そう！',
+    url: 'game5-secret/',
+    color: 'rgba(245,200,66,0.20)',
+    border: '#f5c842',
+    glow: 'rgba(245,200,66,0.55)',
+    rare: true
+  };
+
+  const RARE_RATE = 0.15;  // レア排出率 15%
+
   let spinning = false;
 
   initStars(document.getElementById('stars'));
@@ -590,7 +612,9 @@
     const outlet = document.getElementById('gachaOutlet');
     btn.disabled = true;
 
-    const game = GAMES[Math.floor(Math.random() * GAMES.length)];
+    const game = (Math.random() < RARE_RATE)
+      ? RARE_GAME
+      : GAMES[Math.floor(Math.random() * GAMES.length)];
 
     // ハンドルアニメ開始
     handle.classList.add('spinning');
@@ -620,10 +644,16 @@
     document.getElementById('resultDesc').textContent    = game.desc;
     document.getElementById('playBtn').href              = game.url;
 
+    // レア当選時は特別ラベル
+    document.getElementById('resultLabel').textContent = game.rare
+      ? '🎉 大当たり！レアゲーム出現！'
+      : '✨ カプセルが出てきたよ！';
+
     const card = document.getElementById('resultCard');
     card.style.borderColor = game.border;
     card.style.background  = game.color;
     card.style.boxShadow   = `0 0 28px ${game.glow}`;
+    card.classList.toggle('gacha-result__card--rare', !!game.rare);
 
     document.getElementById('gachaResult').hidden = false;
     spinning = false;
