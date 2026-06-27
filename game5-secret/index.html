@@ -377,6 +377,26 @@ function showFail() {
 }
 
 // ============================================================
+// ゲーム開始 / リセット
+// ============================================================
+function startGame() {
+  // 状態リセット
+  tapsLeft   = MAX_TAPS;
+  tapsUsed   = 0;
+  found      = false;
+  gameActive = true;
+  markers.length = 0;
+
+  document.getElementById('score').textContent = '0';
+  document.getElementById('clue-text').textContent = CLUES[0].text;
+  document.getElementById('start-screen').style.display = 'none';
+
+  updateTapDots();
+  resize();
+  draw();
+}
+
+// ============================================================
 // 初期化
 // ============================================================
 initStars(document.getElementById('stars'));
